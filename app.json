@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myexpoapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -19,7 +18,17 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "usesCleartextTraffic": true,
+      "package": "com.anonymous.MyExpoApp"
     },
     "web": {
       "output": "static",
@@ -38,11 +47,29 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Chúng tôi cần quyền truy cập thư viện ảnh để bạn có thể chọn ảnh từ thiết bị",
+          "cameraPermission": "Chúng tôi cần quyền truy cập camera để bạn có thể chụp ảnh câu hỏi"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "97078513-c99c-4e2f-adef-b8f41ded36e6"
+      }
     }
   }
 }
