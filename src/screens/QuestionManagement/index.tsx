@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -15,6 +16,7 @@ import { COLORS } from "../../constants/colors";
 import { getQuestionSets, QuestionSet } from "../../api/questionService";
 import { storage } from "../../utils/storage";
 import QuestionSetCard from "./QuestionSetCard";
+import DashboardLayout from "../../components/DashboardLayout";
 
 type Props = NativeStackScreenProps<RootStackParamList, "QuestionManagement">;
 
@@ -74,27 +76,19 @@ export default function QuestionManagementScreen({ navigation }: Props) {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={COLORS.black} />
-        </TouchableOpacity>
-        <Text variant="bold" style={styles.headerTitle}>
-          Quản lý câu hỏi
-        </Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Icon name="search" size={24} color={COLORS.black} />
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
+  // Content component
+  const renderContent = () => {
+    if (loading) {
+      return (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Đang tải danh sách...</Text>
         </View>
-      ) : error ? (
+      );
+    }
+
+    if (error) {
+      return (
         <View style={styles.centerContainer}>
           <Icon name="alert-circle" size={48} color={COLORS.gray} />
           <Text style={styles.errorText}>{error}</Text>
@@ -105,7 +99,11 @@ export default function QuestionManagementScreen({ navigation }: Props) {
             <Text style={styles.retryButtonText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
-      ) : questionSets.length === 0 ? (
+      );
+    }
+
+    if (questionSets.length === 0) {
+      return (
         <View style={styles.centerContainer}>
           <Icon name="folder" size={64} color={COLORS.gray} />
           <Text variant="bold" style={styles.emptyTitle}>
@@ -122,69 +120,101 @@ export default function QuestionManagementScreen({ navigation }: Props) {
             <Text style={styles.createButtonText}>Tạo bộ câu hỏi</Text>
           </TouchableOpacity>
         </View>
-      ) : (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[COLORS.primary]}
-            />
-          }
-        >
-          {/* Summary Card */}
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryItem}>
-              <Icon name="folder" size={24} color={COLORS.primary} />
-              <View style={styles.summaryTextContainer}>
-                <Text style={styles.summaryLabel}>Tổng số bộ câu hỏi</Text>
-                <Text variant="bold" style={styles.summaryValue}>
-                  {questionSets.length}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <Icon name="help-circle" size={24} color={COLORS.primary} />
-              <View style={styles.summaryTextContainer}>
-                <Text style={styles.summaryLabel}>Tổng số câu hỏi</Text>
-                <Text variant="bold" style={styles.summaryValue}>
-                  {questionSets.reduce((sum, set) => sum + set.question_count, 0)}
-                </Text>
-              </View>
-            </View>
-          </View>
+      );
+    }
 
-          {/* Question Sets List */}
-          <View style={styles.setsSection}>
-            <Text variant="bold" style={styles.sectionTitle}>
-              Bộ câu hỏi của tôi
-            </Text>
-            {questionSets.map((set) => (
-              <QuestionSetCard
-                key={set.set_id}
-                setId={set.set_id}
-                title={set.title}
-                description={set.description}
-                questionCount={set.question_count}
-                createdAt={formatDate(set.created_at)}
-                onPress={async () => {
-                  const user = await storage.getUser();
-                  if (user && user.id) {
-                    navigation.navigate("QuestionSetDetail", {
-                      userId: user.id,
-                      setId: set.set_id,
-                    });
-                  }
-                }}
-              />
-            ))}
+    return (
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[COLORS.primary]}
+          />
+        }
+        nestedScrollEnabled={Platform.OS === "web"}
+      >
+        {/* Summary Card */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Icon name="folder" size={24} color={COLORS.primary} />
+            <View style={styles.summaryTextContainer}>
+              <Text style={styles.summaryLabel}>Tổng số bộ câu hỏi</Text>
+              <Text variant="bold" style={styles.summaryValue}>
+                {questionSets.length}
+              </Text>
+            </View>
           </View>
-        </ScrollView>
-      )}
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Icon name="help-circle" size={24} color={COLORS.primary} />
+            <View style={styles.summaryTextContainer}>
+              <Text style={styles.summaryLabel}>Tổng số câu hỏi</Text>
+              <Text variant="bold" style={styles.summaryValue}>
+                {questionSets.reduce((sum, set) => sum + set.question_count, 0)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Question Sets List */}
+        <View style={styles.setsSection}>
+          <Text variant="bold" style={styles.sectionTitle}>
+            Bộ câu hỏi của tôi
+          </Text>
+          {questionSets.map((set) => (
+            <QuestionSetCard
+              key={set.set_id}
+              setId={set.set_id}
+              title={set.title}
+              description={set.description}
+              questionCount={set.question_count}
+              createdAt={formatDate(set.created_at)}
+              onPress={async () => {
+                const user = await storage.getUser();
+                if (user && user.id) {
+                  navigation.navigate("QuestionSetDetail", {
+                    userId: user.id,
+                    setId: set.set_id,
+                  });
+                }
+              }}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  // Web Layout
+  if (Platform.OS === "web") {
+    return (
+      <DashboardLayout title="Quản lý câu hỏi" showSearch={true}>
+        {renderContent()}
+      </DashboardLayout>
+    );
+  }
+
+  // Mobile Layout
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Icon name="arrow-left" size={24} color={COLORS.black} />
+        </TouchableOpacity>
+        <Text variant="bold" style={styles.headerTitle}>
+          Quản lý câu hỏi
+        </Text>
+        <TouchableOpacity style={styles.searchButton}>
+          <Icon name="search" size={24} color={COLORS.black} />
+        </TouchableOpacity>
+      </View>
+
+      {renderContent()}
     </View>
   );
 }
@@ -221,8 +251,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 20,
-    paddingBottom: 100,
+    padding: Platform.OS === "web" ? 0 : 20,
+    paddingBottom: Platform.OS === "web" ? 0 : 100,
   },
   centerContainer: {
     flex: 1,

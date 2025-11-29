@@ -1,12 +1,17 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet, Platform } from "react-native";
 import { COLORS } from "../../constants/colors";
 
 export const styles = StyleSheet.create({
   button: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    ...(Platform.OS === "web" ? ({ 
+      paddingVertical: 10,
+      borderRadius: 6,
+      marginTop: 6,
+    } as any) : {}),
   },
   buttonDisabled: {
     backgroundColor: "#ccc",
@@ -16,6 +21,8 @@ export const styles = StyleSheet.create({
     color: COLORS.white,
     textAlign: "center",
     fontWeight: "600",
+    fontSize: 15,
+    ...(Platform.OS === "web" ? ({ fontSize: 14 } as any) : {}),
   },
   textDisabled: {
     color: "#999",

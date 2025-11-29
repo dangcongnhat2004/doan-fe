@@ -1,8 +1,10 @@
+import { Platform } from "react-native";
+
 export const TYPOGRAPHY = {
   fontFamily: {
-    regular: "Inter_24pt-Regular",
-    medium: "Inter_24pt-Medium",
-    bold: "Inter_28pt-Bold",
+    regular: Platform.OS === "web" ? "Inter" : "Inter_24pt-Regular",
+    medium: Platform.OS === "web" ? "Inter" : "Inter_24pt-Medium",
+    bold: Platform.OS === "web" ? "Inter" : "Inter_28pt-Bold",
   },
   fontSize: {
     xs: 12,

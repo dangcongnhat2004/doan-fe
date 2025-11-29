@@ -1,32 +1,37 @@
-import React, { useState, useMemo } from "react";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import React, { useMemo, useState } from "react";
 import {
-  View,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  TextInput,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../../navigation/types";
-import Text from "../../components/Text";
+import {
+    getCurrentUser,
+    getRecentActivities,
+} from "../../api/mockData";
+import BottomNavigation from "../../components/BottomNavigation";
+import DashboardLayout from "../../components/DashboardLayout";
 import FeatureCard from "../../components/FeatureCard";
 import RecentActivityCard from "../../components/RecentActivityCard";
-import BottomNavigation from "../../components/BottomNavigation";
+import Text from "../../components/Text";
 import UserMenu from "../../components/UserMenu";
 import { COLORS } from "../../constants/colors";
-import {
-  getRecentActivities,
-  getCurrentUser,
-} from "../../api/mockData";
+import { RootStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation }: Props) {
   const [isUserMenuVisible, setIsUserMenuVisible] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  // Responsive breakpoint
+  const { width } = useWindowDimensions();
+  const isMobileWeb = Platform.OS === "web" && width < 768;
 
   // Get current user from mock data
   const currentUser = useMemo(() => getCurrentUser(), []);
@@ -100,251 +105,220 @@ export default function HomeScreen({ navigation }: Props) {
     }
   };
 
-  // Web Layout
-  if (Platform.OS === "web") {
-    return (
-      <View style={styles.webContainer}>
-        {/* Sidebar */}
-        <View style={styles.webSidebar}>
-          {/* Logo */}
-          <View style={styles.webSidebarHeader}>
-            <View style={styles.webLogoSquare}>
-              <Text style={styles.webLogoText}>Q</Text>
-            </View>
-            <Text variant="bold" style={styles.webBrandName}>QuestionHub</Text>
-          </View>
-
-          {/* Navigation Menu */}
-          <View style={styles.webMenu}>
-            {menuItems.map((item) => (
-              <TouchableOpacity
-                key={item.name}
-                style={[
-                  styles.webMenuItem,
-                  item.name === "Dashboard" && styles.webMenuItemActive,
-                ]}
-                onPress={() => handleMenuClick(item.route)}
-              >
-                {item.name === "Dashboard" ? (
-                  <View style={styles.webMenuIconSquare}>
-                    <Icon name={item.icon as any} size={16} color={COLORS.primary} />
-                  </View>
-                ) : (
-                  <Icon
-                    name={item.icon as any}
-                    size={20}
-                    color={item.name === "Dashboard" ? COLORS.primary : COLORS.gray}
-                  />
-                )}
-                <Text
-                  style={[
-                    styles.webMenuItemText,
-                    item.name === "Dashboard" && styles.webMenuItemTextActive,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* User Profile */}
-          <View style={styles.webUserProfile}>
-            <View style={styles.webUserAvatar}>
-              <Text style={styles.webUserAvatarText}>
-                {currentUser.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.webUserInfo}>
-              <Text variant="bold" style={styles.webUserName}>
-                {currentUser.name}
-              </Text>
-              <Text style={styles.webUserRole}>
-                {currentUser.role === "teacher" ? "Teacher Account" : "Student Account"}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Main Content */}
-        <View style={styles.webMainContent}>
-          {/* Header Bar */}
-          <View style={styles.webHeader}>
-            <Text variant="bold" style={styles.webHeaderTitle}>
-              Tổng quan
-            </Text>
-            <View style={styles.webHeaderRight}>
-              <View style={styles.webHeaderSearch}>
-                <Icon name="search" size={18} color={COLORS.gray} style={styles.webHeaderSearchIcon} />
-                <TextInput
-                  style={styles.webHeaderSearchInput}
-                  placeholder="Tìm kiếm câu hỏi, đề thi..."
-                  placeholderTextColor={COLORS.gray}
-                />
-              </View>
-              <TouchableOpacity style={styles.webHeaderBell}>
-                <Icon name="bell" size={20} color={COLORS.black} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Content Scroll */}
-          <ScrollView style={styles.webContentScroll} showsVerticalScrollIndicator={false}>
-            <View style={styles.webContentInner}>
-              {/* Welcome Section */}
-              <View style={styles.webWelcomeSection}>
-                <Text variant="bold" style={styles.webWelcomeTitle}>
-                  Xin chào, {currentUser.name.split(" ").pop()}! 👋
-                </Text>
-                <Text style={styles.webWelcomeSubtitle}>
-                  Hôm nay bạn muốn bắt đầu với việc gì?
-                </Text>
-              </View>
-
-              {/* Feature Cards Grid */}
-              <View style={styles.webFeatureGrid}>
-                {features.map((feature, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.webFeatureCard,
-                      index === 0 && styles.webFeatureCardHighlighted,
-                    ]}
-                    onPress={
-                      feature.icon === "upload"
-                        ? () => navigation.navigate("Upload")
-                        : feature.icon === "folder"
-                        ? () => navigation.navigate("QuestionManagement")
-                        : feature.icon === "file-text"
-                        ? () => navigation.navigate("ExamMainPage")
-                        : undefined
-                    }
-                  >
-                    {index === 0 && (
-                      <View style={styles.webFeatureCardIcon}>
-                        <Icon name={feature.icon as any} size={24} color={COLORS.black} />
-                      </View>
-                    )}
-                    {index === 1 && (
-                      <View style={styles.webFeatureCardIcon}>
-                        <Icon name={feature.icon as any} size={24} color={COLORS.primary} />
-                      </View>
-                    )}
-                    {index === 2 && (
-                      <View style={styles.webFeatureCardIcon}>
-                        <Icon name={feature.icon as any} size={24} color="#8B5CF6" />
-                      </View>
-                    )}
-                    {index === 3 && (
-                      <View style={styles.webFeatureCardIcon}>
-                        <Icon name={feature.icon as any} size={24} color="#10B981" />
-                      </View>
-                    )}
-                    <Text variant="bold" style={styles.webFeatureCardTitle}>
-                      {feature.title}
-                    </Text>
-                    <Text style={styles.webFeatureCardDescription}>
-                      {feature.description}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Bottom Section */}
-              <View style={styles.webBottomSection}>
-                {/* Recent Activities */}
-                <View style={styles.webRecentActivities}>
-                  <View style={styles.webRecentActivitiesHeader}>
-                    <View style={styles.webRecentActivitiesTitleRow}>
-                      <Icon name="clock" size={20} color={COLORS.black} />
-                      <Text variant="bold" style={styles.webRecentActivitiesTitle}>
-                        Hoạt động gần đây
-                      </Text>
-                    </View>
-                    <TouchableOpacity>
-                      <Text style={styles.webViewAll}>Xem tất cả</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.webRecentActivitiesList}>
-                    {recentActivities.slice(0, 3).map((activity) => (
-                      <View key={activity.id} style={styles.webRecentActivityItem}>
-                        <View style={styles.webRecentActivityIcon}>
-                          {activity.type === "exam" ? (
-                            <Icon name="file-text" size={20} color="#8B5CF6" />
-                          ) : activity.type === "question" ? (
-                            <Icon name="plus-circle" size={20} color={COLORS.primary} />
-                          ) : (
-                            <Icon name="book-open" size={20} color="#10B981" />
-                          )}
-                        </View>
-                        <View style={styles.webRecentActivityContent}>
-                          <Text variant="bold" style={styles.webRecentActivityTitle}>
-                            {activity.title}
-                          </Text>
-                          <Text style={styles.webRecentActivityDescription}>
-                            {activity.description}
-                          </Text>
-                          <Text style={styles.webRecentActivityDate}>{activity.date}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Quick Stats Widget */}
-                <View style={styles.webQuickStats}>
-                  <Text variant="bold" style={styles.webQuickStatsTitle}>
-                    Thống kê nhanh
-                  </Text>
-                  <Text style={styles.webQuickStatsSubtitle}>
-                    Tiến độ học tập tuần này của bạn
-                  </Text>
-                  <View style={styles.webQuickStatsProgress}>
-                    <View style={styles.webQuickStatsProgressHeader}>
-                      <Text style={styles.webQuickStatsProgressLabel}>
-                        Câu hỏi đã làm
-                      </Text>
-                      <Text style={styles.webQuickStatsProgressValue}>24/50</Text>
-                    </View>
-                    <View style={styles.webQuickStatsProgressBar}>
-                      <View style={[styles.webQuickStatsProgressFill, { width: "48%" }]} />
-                    </View>
-                  </View>
-                  <View style={styles.webQuickStatsExams}>
-                    <Text style={styles.webQuickStatsExamsLabel}>Đề thi đã tạo</Text>
-                    <Text style={styles.webQuickStatsExamsValue}>3</Text>
-                  </View>
-                  <TouchableOpacity style={styles.webQuickStatsButton}>
-                    <Text style={styles.webQuickStatsButtonText}>
-                      Xem báo cáo chi tiết
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* User Menu */}
-        <UserMenu
-          visible={isUserMenuVisible}
-          user={currentUser}
-          notificationsEnabled={notificationsEnabled}
-          onClose={() => setIsUserMenuVisible(false)}
-          onNotificationsToggle={setNotificationsEnabled}
-          onSettingsPress={handleSettings}
-          onPremiumPress={handlePremium}
-          onLogoutPress={handleLogout}
-        />
+  // Content component - will be wrapped in DashboardLayout
+  const dashboardContent = (
+    <>
+      {/* Welcome Section */}
+      <View style={styles.webWelcomeSection}>
+        <Text variant="bold" style={styles.webWelcomeTitle}>
+          Xin chào, {currentUser.name.split(" ").pop()}! 👋
+        </Text>
+        <Text style={styles.webWelcomeSubtitle}>
+          Hôm nay bạn muốn bắt đầu với việc gì?
+        </Text>
       </View>
+
+      {/* Feature Cards Grid */}
+      <View style={styles.webFeatureGrid}>
+        {features.map((feature, index) => {
+          const iconColors = ["#8B5CF6", "#8B5CF6", "#8B5CF6", "#10B981"];
+          const iconBackgrounds = ["#E8D5FF", "#E8D5FF", "#E8D5FF", "#D1FAE5"];
+          
+          return (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.webFeatureCard,
+                index === 0 && styles.webFeatureCardHighlighted,
+              ]}
+              onPress={
+                feature.icon === "upload"
+                  ? () => navigation.navigate("Upload")
+                  : feature.icon === "folder"
+                  ? () => navigation.navigate("QuestionManagement")
+                  : feature.icon === "file-text"
+                  ? () => navigation.navigate("ExamMainPage")
+                  : undefined
+              }
+            >
+              <View style={[styles.webFeatureCardIconContainer, { backgroundColor: iconBackgrounds[index] }]}>
+                <Icon name={feature.icon as any} size={24} color={iconColors[index]} />
+              </View>
+              <Text variant="bold" style={styles.webFeatureCardTitle}>
+                {feature.title}
+              </Text>
+              <Text style={styles.webFeatureCardDescription}>
+                {feature.description}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Bottom Section */}
+      <View style={styles.webBottomSection}>
+        {/* Recent Activities */}
+        <View style={styles.webRecentActivities}>
+          <View style={styles.webRecentActivitiesHeader}>
+            <View style={styles.webRecentActivitiesTitleRow}>
+              <Icon name="clock" size={20} color={COLORS.black} />
+              <Text variant="bold" style={styles.webRecentActivitiesTitle}>
+                Hoạt động gần đây
+              </Text>
+            </View>
+            <TouchableOpacity>
+              <Text style={styles.webViewAll}>Xem tất cả</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.webRecentActivitiesList}>
+            {recentActivities.slice(0, 3).map((activity) => {
+              let iconName = "file-text";
+              let iconColor = "#8B5CF6";
+              let iconBg = "#E8D5FF";
+              
+              if (activity.type === "question") {
+                iconName = "plus-circle";
+                iconColor = COLORS.primary;
+                iconBg = "#D6E8FF";
+              } else if (activity.type === "exam") {
+                iconName = "file-text";
+                iconColor = "#8B5CF6";
+                iconBg = "#E8D5FF";
+              }
+              
+              if (activity.title.toLowerCase().includes("ôn tập") || 
+                  activity.title.toLowerCase().includes("flashcard") ||
+                  activity.description.toLowerCase().includes("flashcard")) {
+                iconName = "book-open";
+                iconColor = "#10B981";
+                iconBg = "#D1FAE5";
+              }
+              
+              return (
+                <View key={activity.id} style={styles.webRecentActivityItem}>
+                  <View style={[styles.webRecentActivityIcon, { backgroundColor: iconBg }]}>
+                    <Icon name={iconName as any} size={20} color={iconColor} />
+                  </View>
+                  <View style={styles.webRecentActivityContent}>
+                    <Text variant="bold" style={styles.webRecentActivityTitle}>
+                      {activity.title}
+                    </Text>
+                    <Text style={styles.webRecentActivityDescription}>
+                      {activity.description}
+                    </Text>
+                    <Text style={styles.webRecentActivityDate}>{activity.date}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.webRecentActivityMore}>
+                    <Icon name="more-vertical" size={18} color={COLORS.gray} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Quick Stats Widget */}
+        <View style={styles.webQuickStats}>
+          <Text variant="bold" style={styles.webQuickStatsTitle}>
+            Thống kê nhanh
+          </Text>
+          <View style={styles.webQuickStatsProgress}>
+            <Text style={styles.webQuickStatsProgressLabel}>
+              Tiến độ học tập tuần này của bạn
+            </Text>
+            <View style={styles.webQuickStatsProgressHeader}>
+              <Text style={styles.webQuickStatsProgressSubLabel}>
+                Câu hỏi đã làm
+              </Text>
+              <Text style={styles.webQuickStatsProgressValue}>24/50</Text>
+            </View>
+            <View style={styles.webQuickStatsProgressBar}>
+              <View style={[styles.webQuickStatsProgressFill, { width: "48%" }]} />
+            </View>
+          </View>
+          <View style={styles.webQuickStatsExams}>
+            <Text style={styles.webQuickStatsExamsLabel}>Đề thi đã tạo</Text>
+            <Text style={styles.webQuickStatsExamsValue}>3</Text>
+          </View>
+          <TouchableOpacity style={styles.webQuickStatsButton}>
+            <Text style={styles.webQuickStatsButtonText}>
+              Xem báo cáo chi tiết
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </>
+  );
+
+  // Mobile content for mobile web
+  const mobileContent = (
+    <>
+      {/* Welcome Section */}
+      <View style={styles.mobileWelcomeSection}>
+        <Text variant="bold" style={styles.mobileWelcomeTitle}>
+          Xin chào, {currentUser.name.split(" ").pop()}! 👋
+        </Text>
+        <Text style={styles.mobileWelcomeSubtitle}>
+          Hôm nay bạn muốn bắt đầu với việc gì?
+        </Text>
+      </View>
+
+      {/* Feature Cards Grid */}
+      <View style={styles.gridContainer}>
+        {features.map((feature, index) => (
+          <View key={index} style={styles.gridItem}>
+            <FeatureCard
+              icon={feature.icon}
+              title={feature.title}
+              description={feature.description}
+              onPress={
+                feature.icon === "upload"
+                  ? () => navigation.navigate("Upload")
+                  : feature.icon === "folder"
+                  ? () => navigation.navigate("QuestionManagement")
+                  : feature.icon === "file-text"
+                  ? () => navigation.navigate("ExamMainPage")
+                  : undefined
+              }
+            />
+          </View>
+        ))}
+      </View>
+
+      {/* Recent Activities */}
+      <View style={styles.section}>
+        <Text variant="bold" style={styles.sectionTitle}>
+          Hoạt động gần đây
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.horizontalScroll}
+        >
+          {recentActivities.map((activity) => (
+            <RecentActivityCard
+              key={activity.id}
+              title={activity.title}
+              description={activity.description}
+              date={activity.date}
+            />
+          ))}
+        </ScrollView>
+      </View>
+    </>
+  );
+
+  // Web Layout - use DashboardLayout
+  if (Platform.OS === "web") {
+    // DashboardLayout will handle mobile/desktop responsive internally
+    return (
+      <DashboardLayout title="Tổng quan">
+        {isMobileWeb ? mobileContent : dashboardContent}
+      </DashboardLayout>
     );
   }
 
-  // Mobile Layout (keep existing)
+  // Native Mobile Layout - Complete separate layout
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -376,6 +350,16 @@ export default function HomeScreen({ navigation }: Props) {
               />
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Welcome Section */}
+        <View style={styles.mobileWelcomeSection}>
+          <Text variant="bold" style={styles.mobileWelcomeTitle}>
+            Xin chào, {currentUser.name.split(" ").pop()}! 👋
+          </Text>
+          <Text style={styles.mobileWelcomeSubtitle}>
+            Hôm nay bạn muốn bắt đầu với việc gì?
+          </Text>
         </View>
 
         {/* Feature Cards Grid */}
@@ -493,6 +477,20 @@ const styles = StyleSheet.create({
   avatar: {
     width: "100%",
     height: "100%",
+  },
+  mobileWelcomeSection: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  mobileWelcomeTitle: {
+    fontSize: 28,
+    color: COLORS.black,
+    marginBottom: 8,
+  },
+  mobileWelcomeSubtitle: {
+    fontSize: 14,
+    color: COLORS.gray,
   },
   gridContainer: {
     flexDirection: "row",
@@ -712,6 +710,14 @@ const styles = StyleSheet.create({
   webFeatureCardIcon: {
     marginBottom: 16,
   },
+  webFeatureCardIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   webFeatureCardTitle: {
     fontSize: 18,
     color: COLORS.black,
@@ -755,14 +761,16 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   webRecentActivitiesList: {
-    gap: 16,
+    gap: 0,
   },
   webRecentActivityItem: {
     flexDirection: "row",
     gap: 12,
     paddingBottom: 16,
+    marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderGray,
+    alignItems: "flex-start",
   },
   webRecentActivityIcon: {
     width: 40,
@@ -789,6 +797,11 @@ const styles = StyleSheet.create({
   webRecentActivityDate: {
     fontSize: 12,
     color: COLORS.gray,
+    marginTop: 4,
+  },
+  webRecentActivityMore: {
+    padding: 4,
+    alignSelf: "flex-start",
   },
   webQuickStats: {
     width: 320,
@@ -822,6 +835,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   webQuickStatsProgressLabel: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginBottom: 16,
+  },
+  webQuickStatsProgressSubLabel: {
     fontSize: 14,
     color: "rgba(255, 255, 255, 0.9)",
   },

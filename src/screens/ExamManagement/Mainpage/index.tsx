@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, Alert, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, Alert, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Platform } from "react-native";
 import ScreenHeader from "../../../components/ScreenHeader";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "./styles";
@@ -10,6 +10,7 @@ import ExamCard from "./ExamCard";
 import WidgetTab from "./WidgetTab";
 import { BottomNavigation } from "../../../components";
 import CreateExamModal from "./CreateExamModal";
+import DashboardLayout from "../../../components/DashboardLayout";
 
 
 export default function ExamMainPage() {
@@ -80,29 +81,18 @@ export default function ExamMainPage() {
   const totalStudents = 350; // This might come from a different API
   const pendingExam = 5; // This might come from a different API
 
-  if (loading && !refreshing) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScreenHeader    
-          title="Quản lý đề thi"
-          functionIcon="settings"
-          function={() => Alert.alert('Icon clicked!')}
-        />
+  // Content component
+  const renderContent = () => {
+    if (loading && !refreshing) {
+      return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
-      </SafeAreaView>
-    );
-  }
+      );
+    }
 
-  return (
-    <SafeAreaView style={styles.container}>
-        <ScreenHeader    
-          title="Quản lý đề thi"
-          functionIcon="settings"
-          function={() => Alert.alert('Icon clicked!')}
-        />
-
+    return (
+      <>
         {error && (
           <View style={{ padding: 16, backgroundColor: '#ffebee', margin: 16, borderRadius: 8 }}>
             <Text style={{ color: '#c62828' }}>{error}</Text>
@@ -151,20 +141,54 @@ export default function ExamMainPage() {
               </View>
             ) : null
           }
-      />
+          nestedScrollEnabled={Platform.OS === "web"}
+        />
 
-      {/* Floating button */}
-      <TouchableOpacity
-        style={[
-          styles.fab,
-          {
-            bottom: Math.max(insets.bottom, 12) + 72,
-          },
-        ]}
-        onPress={handleCreateExam}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+        {/* Floating button */}
+        {Platform.OS !== "web" && (
+          <TouchableOpacity
+            style={[
+              styles.fab,
+              {
+                bottom: Math.max(insets.bottom, 12) + 72,
+              },
+            ]}
+            onPress={handleCreateExam}
+          >
+            <Text style={styles.fabText}>+</Text>
+          </TouchableOpacity>
+        )}
+      </>
+    );
+  };
+
+  // Web Layout
+  if (Platform.OS === "web") {
+    return (
+      <>
+        <DashboardLayout title="Đề thi" showSearch={true}>
+          {renderContent()}
+        </DashboardLayout>
+        {/* Create Exam Modal */}
+        <CreateExamModal
+          visible={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleExamCreated}
+        />
+      </>
+    );
+  }
+
+  // Mobile Layout
+  return (
+    <SafeAreaView style={styles.container}>
+        <ScreenHeader    
+          title="Quản lý đề thi"
+          functionIcon="settings"
+          function={() => Alert.alert('Icon clicked!')}
+        />
+
+        {renderContent()}
 
       {/* Create Exam Modal */}
       <CreateExamModal
@@ -175,10 +199,6 @@ export default function ExamMainPage() {
 
        {/* Bottom Navigation */}
       <BottomNavigation currentTab={'ExamMainPage'} />
-
-
-      {/* bottom navbar */}
-      
     </SafeAreaView>
   );
 }

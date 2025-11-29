@@ -7,11 +7,12 @@ import { COLORS } from "../../constants/colors";
 type UploadBoxProps = {
   icon: string;
   title: string;
+  subtitle?: string;
   onPress: () => void;
   disabled?: boolean;
 };
 
-export default function UploadBox({ icon, title, onPress, disabled = false }: UploadBoxProps) {
+export default function UploadBox({ icon, title, subtitle, onPress, disabled = false }: UploadBoxProps) {
   return (
     <TouchableOpacity
       style={[styles.container, disabled && styles.containerDisabled]}
@@ -23,6 +24,7 @@ export default function UploadBox({ icon, title, onPress, disabled = false }: Up
         <Icon name={icon} size={32} color={COLORS.primary} />
       </View>
       <Text style={styles.title}>{title}</Text>
+      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </TouchableOpacity>
   );
 }
@@ -57,6 +59,14 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     textAlign: "center",
     lineHeight: 20,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: COLORS.gray,
+    textAlign: "center",
+    lineHeight: 18,
   },
 });
 

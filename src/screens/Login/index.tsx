@@ -86,69 +86,71 @@ export default function LoginScreen({ navigation, route }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={{ uri: "https://cdn-icons-png.flaticon.com/512/564/564445.png" }}
-        style={styles.logo}
-      />
-
-      <Text style={styles.appName}>Question Hub</Text>
-      <Text style={styles.title}>Chào mừng trở lại!</Text>
-
-      <SuccessMessage message={successMessage} />
-      <ErrorMessage message={errorMessage} />
-
-      <InputField
-        icon="mail"
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        editable={!loading}
-      />
-
-      <InputField
-        icon="lock"
-        placeholder="Mật khẩu"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        editable={!loading}
-      />
-
-      {/* ✅ Text Quên mật khẩu */}
-      <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-
-      <PrimaryButton
-        title={loading ? "Đang đăng nhập..." : "Đăng nhập"}
-        onPress={handleLogin}
-        disabled={loading}
-      />
-
-      <Divider />
-
-      {/* Google Login */}
-      <TouchableOpacity style={styles.socialButton}>
-      <Image source={Images.google} style={styles.socialLogo} />
-        <Text style={styles.socialText}>Đăng nhập với Google</Text>
-      </TouchableOpacity>
-
-      {/* Facebook Login */}
-      <TouchableOpacity style={[styles.socialButton, styles.fbButton]}>
+    <View style={styles.outerContainer}>
+      <View style={styles.cardContainer}>
         <Image
-          source={{ uri: "https://cdn-icons-png.flaticon.com/512/733/733547.png" }}
-          style={styles.socialLogo}
+          source={{ uri: "https://cdn-icons-png.flaticon.com/512/564/564445.png" }}
+          style={styles.logo}
         />
-        <Text style={styles.socialTextFB}>Đăng nhập với Facebook</Text>
-      </TouchableOpacity>
 
-      <Text style={styles.footerText}>
-        Chưa có tài khoản?
-        <Text style={styles.registerLink} onPress={() => navigation.navigate("Register")}>
-          {" "}Đăng ký
+        <Text style={styles.appName}>Question Hub</Text>
+        <Text style={styles.title}>Chào mừng trở lại!</Text>
+
+        <SuccessMessage message={successMessage} />
+        <ErrorMessage message={errorMessage} />
+
+        <InputField
+          icon="mail"
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          editable={!loading}
+        />
+
+        <InputField
+          icon="lock"
+          placeholder="Mật khẩu"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          editable={!loading}
+        />
+
+        {/* ✅ Text Quên mật khẩu */}
+        <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+
+        <PrimaryButton
+          title={loading ? "Đang đăng nhập..." : "Đăng nhập"}
+          onPress={handleLogin}
+          disabled={loading}
+        />
+
+        <Divider />
+
+        {/* Google Login */}
+        <TouchableOpacity style={styles.socialButton}>
+        <Image source={Images.google} style={styles.socialLogo} />
+          <Text style={styles.socialText}>Đăng nhập với Google</Text>
+        </TouchableOpacity>
+
+        {/* Facebook Login */}
+        <TouchableOpacity style={[styles.socialButton, styles.fbButton]}>
+          <Image
+            source={{ uri: "https://cdn-icons-png.flaticon.com/512/733/733547.png" }}
+            style={styles.socialLogo}
+          />
+          <Text style={styles.socialTextFB}>Đăng nhập với Facebook</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.footerText}>
+          Chưa có tài khoản?
+          <Text style={styles.registerLink} onPress={() => navigation.navigate("Register")}>
+            {" "}Đăng ký
+          </Text>
         </Text>
-      </Text>
+      </View>
     </View>
   );
 }

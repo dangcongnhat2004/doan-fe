@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  Platform,
 } from "react-native";
 import { Feather as Icon } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -14,6 +15,7 @@ import { RootStackParamList } from "../../navigation/types";
 import { COLORS } from "../../constants/colors";
 import Text from "../../components/Text";
 import BottomNavigation from "../../components/BottomNavigation";
+import DashboardLayout from "../../components/DashboardLayout";
 import {
   semanticSearchQuestions,
   SemanticSearchResult,
@@ -203,22 +205,9 @@ export default function SearchScreen({ navigation }: Props) {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Icon name="arrow-left" size={24} color={COLORS.black} />
-        </TouchableOpacity>
-        <Text variant="bold" style={styles.headerTitle}>
-          Tìm kiếm
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
-
+  // Content component
+  const renderContent = () => (
+    <>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -262,7 +251,38 @@ export default function SearchScreen({ navigation }: Props) {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={Platform.OS === "web"}
       />
+    </>
+  );
+
+  // Web Layout
+  if (Platform.OS === "web") {
+    return (
+      <DashboardLayout title="Tìm kiếm" showSearch={false}>
+        {renderContent()}
+      </DashboardLayout>
+    );
+  }
+
+  // Mobile Layout
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Icon name="arrow-left" size={24} color={COLORS.black} />
+        </TouchableOpacity>
+        <Text variant="bold" style={styles.headerTitle}>
+          Tìm kiếm
+        </Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      {renderContent()}
 
       {/* Bottom Navigation */}
       <BottomNavigation currentTab="Search" />
@@ -335,8 +355,8 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 100,
+    padding: Platform.OS === "web" ? 0 : 16,
+    paddingBottom: Platform.OS === "web" ? 0 : 100,
   },
   resultCard: {
     backgroundColor: COLORS.white,
