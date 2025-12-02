@@ -54,7 +54,7 @@ export default function DashboardLayout({
       label: "Đề thi",
       route: "ExamMainPage",
     },
-    { name: "Study", icon: "book-open", label: "Học tập", route: null },
+    { name: "Study", icon: "book-open", label: "Học tập", route: "LearningTools" },
   ];
 
   const currentRouteName = route.name;

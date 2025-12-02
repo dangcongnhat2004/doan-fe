@@ -82,6 +82,12 @@ const ExamCard: React.FC<ExamCardProps> = ({
                 </View>
             ): (
                 <View style={{ marginTop: 12 }}>
+                    {/* Tag "Đang hoạt động" nếu có tiến độ */}
+                    {progress > 0 && progress < 100 && (
+                        <View style={[styles.statusBadge, styles.activeBadge]}>
+                            <Text style={[styles.badgeText, styles.activeBadgeText]}>Đang hoạt động</Text>
+                        </View>
+                    )}
                     <View style={styles.progressRow}>
                         <Text style={styles.progressLabel}>Tiến độ: {progress}%</Text>
                     </View>

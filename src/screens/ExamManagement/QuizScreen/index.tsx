@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Alert, ActivityIndicator, ScrollView, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { styles } from './styles';
 import { COLORS } from '../../../constants/colors';
 import QuestionMenuModal from './QuestionMenuModal';
+import ConfirmModal from './ConfirmModal';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/types';
 import { getExamById, submitExamResults, ExamQuestion } from '../../../api/examService';
@@ -23,12 +25,14 @@ export default function ExamDoingPage({ route, navigation }: Props) {
   const [answers, setAnswers] = useState<Map<string, { choiceId: string | number; answeredAt: string }>>(new Map());
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
   const [startedAt, setStartedAt] = useState<string>(new Date().toISOString());
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
 
   const toggleMenu = useCallback(() => {
     setVisible(prev => !prev);
   }, []);
 
-  // Load exam data
+  // Load exam data and restore progress
   useEffect(() => {
     const loadExam = async () => {
       try {
@@ -44,6 +48,16 @@ export default function ExamDoingPage({ route, navigation }: Props) {
           }
         }
         setTimeLeft(examDuration * 60);
+
+        // Restore progress from storage
+        const savedProgress = await storage.getExamProgress(examId);
+        if (savedProgress && savedProgress.answers.length > 0) {
+          const restoredAnswers = new Map<string, { choiceId: string | number; answeredAt: string }>();
+          savedProgress.answers.forEach(({ questionId, choiceId, answeredAt }) => {
+            restoredAnswers.set(questionId, { choiceId, answeredAt });
+          });
+          setAnswers(restoredAnswers);
+        }
       } catch (err: any) {
         console.error("Error loading exam:", err);
         Alert.alert("Lỗi", err.message || "Không thể tải đề thi. Vui lòng thử lại.");
@@ -56,6 +70,10 @@ export default function ExamDoingPage({ route, navigation }: Props) {
     loadExam();
   }, [examId, navigation]);
 
+  const handleSubmitExam = useCallback(() => {
+    setShowSubmitModal(true);
+  }, []);
+
   // Timer countdown
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -67,7 +85,7 @@ export default function ExamDoingPage({ route, navigation }: Props) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, handleSubmitExam]);
 
   const formatTime = useCallback((seconds: number) => {
     const m = String(Math.floor(seconds / 60)).padStart(2, '0');
@@ -87,121 +105,131 @@ export default function ExamDoingPage({ route, navigation }: Props) {
     });
   };
 
-  const handleSubmitExam = useCallback(async () => {
-    setTimeout(() => {
-      Alert.alert(
-        "Xác nhận",
-        "Bạn có chắc chắn muốn nộp bài thi?",
-        [
-          { text: "Hủy", style: "cancel" },
-          {
-            text: "Nộp bài",
-            onPress: async () => {
-              try {
-                setSubmitting(true);
-                const user = await storage.getUser();
-                if (!user || !user.id) {
-                  setTimeout(() => {
-                    Alert.alert("Lỗi", "Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
-                  }, 100);
-                  return;
-                }
+  // Auto-save progress when answers change
+  useEffect(() => {
+    if (questions.length > 0) {
+      const progress = Math.round((answers.size / questions.length) * 100);
+      // Save progress even if no answers yet (to track 0% progress)
+      storage.setExamProgress(examId, progress, answers);
+    }
+  }, [answers, questions.length, examId]);
 
-                const answersArray = questions.map((question) => {
-                  const answer = answers.get(question.question_id);
-                  if (answer) {
-                    return {
-                      question_id: question.question_id,
-                      selected_choice_id: answer.choiceId.toString(),
-                      answered_at: answer.answeredAt,
-                    };
+  const performSubmitExam = useCallback(async () => {
+    try {
+      setSubmitting(true);
+      setShowSubmitModal(false);
+      const user = await storage.getUser();
+      if (!user || !user.id) {
+        setTimeout(() => {
+          Alert.alert("Lỗi", "Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
+        }, 100);
+        return;
+      }
+
+      const answersArray = questions.map((question) => {
+        const answer = answers.get(question.question_id);
+        if (answer) {
+          return {
+            question_id: question.question_id,
+            selected_choice_id: answer.choiceId.toString(),
+            answered_at: answer.answeredAt,
+          };
+        }
+        return null;
+      }).filter((answer) => answer !== null) as Array<{
+        question_id: string;
+        selected_choice_id: string;
+        answered_at: string;
+      }>;
+
+      if (answersArray.length === 0) {
+        setTimeout(() => {
+          Alert.alert(
+            "Cảnh báo",
+            "Bạn chưa trả lời câu hỏi nào. Bạn có muốn nộp bài thi không?",
+            [
+              { text: "Hủy", style: "cancel" },
+              {
+                text: "Nộp bài",
+                onPress: async () => {
+                  try {
+                    const emptyResult = await submitExamResults(examId, {
+                      user_id: user.id,
+                      started_at: startedAt,
+                      answers: [],
+                    });
+                    // Clear progress from storage after successful submission
+                    await storage.removeExamProgress(examId);
+                    const reviewDataWithAnswers = questions.map(q => {
+                      const answer = answers.get(q.question_id);
+                      return {
+                        ...q,
+                        is_selected: answer ? answer.choiceId : null,
+                      };
+                    });
+                    navigation.navigate('ReviewExam', {
+                      reviewData: reviewDataWithAnswers,
+                      examResult: emptyResult,
+                      examId: examId,
+                      startedAt: startedAt,
+                    });
+                  } catch (err: any) {
+                    console.error("Error submitting exam:", err);
+                    setTimeout(() => {
+                      Alert.alert("Lỗi", err.message || "Không thể nộp bài thi. Vui lòng trả lời ít nhất một câu hỏi.");
+                    }, 100);
+                  } finally {
+                    setSubmitting(false);
                   }
-                  return null;
-                }).filter((answer) => answer !== null) as Array<{
-                  question_id: string;
-                  selected_choice_id: string;
-                  answered_at: string;
-                }>;
+                },
+              },
+            ]
+          );
+        }, 100);
+        return;
+      }
 
-                if (answersArray.length === 0) {
-                  setTimeout(() => {
-                    Alert.alert(
-                      "Cảnh báo",
-                      "Bạn chưa trả lời câu hỏi nào. Bạn có muốn nộp bài thi không?",
-                      [
-                        { text: "Hủy", style: "cancel" },
-                        {
-                          text: "Nộp bài",
-                          onPress: async () => {
-                            try {
-                              const emptyResult = await submitExamResults(examId, {
-                                user_id: user.id,
-                                started_at: startedAt,
-                                answers: [],
-                              });
-                              const reviewDataWithAnswers = questions.map(q => {
-                                const answer = answers.get(q.question_id);
-                                return {
-                                  ...q,
-                                  is_selected: answer ? answer.choiceId : null,
-                                };
-                              });
-                              navigation.navigate('ReviewExam', {
-                                reviewData: reviewDataWithAnswers,
-                                examResult: emptyResult,
-                                examId: examId,
-                                startedAt: startedAt,
-                              });
-                            } catch (err: any) {
-                              console.error("Error submitting exam:", err);
-                              setTimeout(() => {
-                                Alert.alert("Lỗi", err.message || "Không thể nộp bài thi. Vui lòng trả lời ít nhất một câu hỏi.");
-                              }, 100);
-                            } finally {
-                              setSubmitting(false);
-                            }
-                          },
-                        },
-                      ]
-                    );
-                  }, 100);
-                  return;
-                }
+      const result = await submitExamResults(examId, {
+        user_id: user.id,
+        started_at: startedAt,
+        answers: answersArray,
+      });
 
-                const result = await submitExamResults(examId, {
-                  user_id: user.id,
-                  started_at: startedAt,
-                  answers: answersArray,
-                });
+      // Clear progress from storage after successful submission
+      await storage.removeExamProgress(examId);
 
-                const reviewDataWithAnswers = questions.map(q => {
-                  const answer = answers.get(q.question_id);
-                  return {
-                    ...q,
-                    is_selected: answer ? answer.choiceId : null,
-                  };
-                });
-                
-                navigation.navigate('ReviewExam', {
-                  reviewData: reviewDataWithAnswers,
-                  examResult: result,
-                  examId: examId,
-                  startedAt: startedAt,
-                });
-              } catch (err: any) {
-                console.error("Error submitting exam:", err);
-                setTimeout(() => {
-                  Alert.alert("Lỗi", err.message || "Không thể nộp bài thi. Vui lòng thử lại.");
-                }, 100);
-              } finally {
-                setSubmitting(false);
-              }
-            },
-          },
-        ]
-      );
-    }, 100);
+      const reviewDataWithAnswers = questions.map(q => {
+        const answer = answers.get(q.question_id);
+        return {
+          ...q,
+          is_selected: answer ? answer.choiceId : null,
+        };
+      });
+      
+      navigation.navigate('ReviewExam', {
+        reviewData: reviewDataWithAnswers,
+        examResult: result,
+        examId: examId,
+        startedAt: startedAt,
+      });
+    } catch (err: any) {
+      console.error("Error submitting exam:", err);
+      setTimeout(() => {
+        Alert.alert("Lỗi", err.message || "Không thể nộp bài thi. Vui lòng thử lại.");
+      }, 100);
+    } finally {
+      setSubmitting(false);
+    }
   }, [questions, answers, examId, startedAt, navigation]);
+
+  const handleExitExam = useCallback(() => {
+    setShowExitModal(true);
+  }, []);
+
+  const performExitExam = useCallback(() => {
+    setShowExitModal(false);
+    navigation.goBack();
+  }, [navigation]);
 
   const handleNextQuestion = () => {
     if (currentQuestion < questions.length - 1) {
@@ -248,6 +276,8 @@ export default function ExamDoingPage({ route, navigation }: Props) {
     return answers.size;
   }, [answers]);
 
+  const insets = useSafeAreaInsets();
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -262,7 +292,7 @@ export default function ExamDoingPage({ route, navigation }: Props) {
       <View style={styles.emptyContainer}>
         <Icon name="description" size={48} color={COLORS.gray} />
         <Text style={styles.emptyText}>Không có câu hỏi nào trong đề thi này.</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleExitExam}>
           <Text style={styles.backButtonText}>Quay lại</Text>
         </TouchableOpacity>
       </View>
@@ -274,12 +304,12 @@ export default function ExamDoingPage({ route, navigation }: Props) {
   const isFlagged = flaggedQuestions.has(currentQ?.question_id || '');
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Bar */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: Math.max(insets.top - 20, 8) }]}>
         <TouchableOpacity 
           style={styles.closeButton}
-          onPress={() => navigation.goBack()}
+          onPress={handleExitExam}
           accessible={true}
           accessibilityLabel="Đóng"
         >
@@ -375,7 +405,7 @@ export default function ExamDoingPage({ route, navigation }: Props) {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity
           style={[styles.navButton, styles.navButtonSecondary, currentQuestion === 0 && styles.navButtonDisabled]}
           onPress={handlePreviousQuestion}
@@ -428,6 +458,31 @@ export default function ExamDoingPage({ route, navigation }: Props) {
         toggleMenu={toggleMenu}
         flaggedQuestions={flaggedQuestions}
       />
-    </View>
+
+      {/* Submit Confirmation Modal */}
+      <ConfirmModal
+        visible={showSubmitModal}
+        title="Lưu ý"
+        message="Bạn có chắc chắn nộp bài không?"
+        secondMessage="Bạn vẫn chưa hoàn thành bài thi?"
+        cancelText="Quay lại bài thi"
+        confirmText="Nộp bài"
+        confirmColor={COLORS.primary}
+        onCancel={() => setShowSubmitModal(false)}
+        onConfirm={performSubmitExam}
+      />
+
+      {/* Exit Confirmation Modal */}
+      <ConfirmModal
+        visible={showExitModal}
+        title="Lưu ý"
+        message="Bạn có chắc chắn thoát bài thi không?"
+        cancelText="Quay lại bài thi"
+        confirmText="Thoát"
+        confirmColor="#EF4444"
+        onCancel={() => setShowExitModal(false)}
+        onConfirm={performExitExam}
+      />
+    </SafeAreaView>
   );
 }

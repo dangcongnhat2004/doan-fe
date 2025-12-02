@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     Image,
     Platform,
@@ -10,10 +10,7 @@ import {
     useWindowDimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
-import {
-    getCurrentUser,
-    getRecentActivities,
-} from "../../api/mockData";
+import { getRecentActivities } from "../../api/mockData";
 import BottomNavigation from "../../components/BottomNavigation";
 import DashboardLayout from "../../components/DashboardLayout";
 import FeatureCard from "../../components/FeatureCard";
@@ -22,19 +19,35 @@ import Text from "../../components/Text";
 import UserMenu from "../../components/UserMenu";
 import { COLORS } from "../../constants/colors";
 import { RootStackParamList } from "../../navigation/types";
+import { storage } from "../../utils/storage";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation }: Props) {
   const [isUserMenuVisible, setIsUserMenuVisible] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  // Get current user from storage (real login)
+  const [currentUserName, setCurrentUserName] = useState<string>("A");
 
   // Responsive breakpoint
   const { width } = useWindowDimensions();
   const isMobileWeb = Platform.OS === "web" && width < 768;
 
-  // Get current user from mock data
-  const currentUser = useMemo(() => getCurrentUser(), []);
+  // Load user name from storage once
+  useEffect(() => {
+    const loadUserName = async () => {
+      try {
+        const user = await storage.getUser();
+        if (user?.name) {
+          setCurrentUserName(user.name);
+        }
+      } catch {
+        // ignore, keep default name
+      }
+    };
+
+    loadUserName();
+  }, []);
 
   // Get recent activities from mock data (based on ERD)
   const recentActivities = useMemo(() => getRecentActivities(), []);
@@ -100,8 +113,8 @@ export default function HomeScreen({ navigation }: Props) {
     if (route) {
       navigation.navigate(route as any);
     } else {
-      // TODO: Show coming soon message
-      console.log("Coming soon");
+      // Navigate to LearningTools for Study
+      navigation.navigate("LearningTools" as any);
     }
   };
 
@@ -111,7 +124,7 @@ export default function HomeScreen({ navigation }: Props) {
       {/* Welcome Section */}
       <View style={styles.webWelcomeSection}>
         <Text variant="bold" style={styles.webWelcomeTitle}>
-          Xin chào, {currentUser.name.split(" ").pop()}! 👋
+          Xin chào, {currentUserName}! 👋
         </Text>
         <Text style={styles.webWelcomeSubtitle}>
           Hôm nay bạn muốn bắt đầu với việc gì?
@@ -138,6 +151,8 @@ export default function HomeScreen({ navigation }: Props) {
                   ? () => navigation.navigate("QuestionManagement")
                   : feature.icon === "file-text"
                   ? () => navigation.navigate("ExamMainPage")
+                  : feature.icon === "book"
+                  ? () => navigation.navigate("LearningTools")
                   : undefined
               }
             >
@@ -256,7 +271,7 @@ export default function HomeScreen({ navigation }: Props) {
       {/* Welcome Section */}
       <View style={styles.mobileWelcomeSection}>
         <Text variant="bold" style={styles.mobileWelcomeTitle}>
-          Xin chào, {currentUser.name.split(" ").pop()}! 👋
+          Xin chào, {currentUserName}! 👋
         </Text>
         <Text style={styles.mobileWelcomeSubtitle}>
           Hôm nay bạn muốn bắt đầu với việc gì?
@@ -278,6 +293,8 @@ export default function HomeScreen({ navigation }: Props) {
                   ? () => navigation.navigate("QuestionManagement")
                   : feature.icon === "file-text"
                   ? () => navigation.navigate("ExamMainPage")
+                  : feature.icon === "book"
+                  ? () => navigation.navigate("LearningTools")
                   : undefined
               }
             />
@@ -343,7 +360,7 @@ export default function HomeScreen({ navigation }: Props) {
               <Image
                 source={{
                   uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    currentUser.name
+                    currentUserName || "User"
                   )}&background=007AFF&color=fff`,
                 }}
                 style={styles.avatar}
@@ -354,8 +371,8 @@ export default function HomeScreen({ navigation }: Props) {
 
         {/* Welcome Section */}
         <View style={styles.mobileWelcomeSection}>
-          <Text variant="bold" style={styles.mobileWelcomeTitle}>
-            Xin chào, {currentUser.name.split(" ").pop()}! 👋
+        <Text variant="bold" style={styles.mobileWelcomeTitle}>
+            Xin chào, {currentUserName}! 👋
           </Text>
           <Text style={styles.mobileWelcomeSubtitle}>
             Hôm nay bạn muốn bắt đầu với việc gì?
@@ -377,6 +394,8 @@ export default function HomeScreen({ navigation }: Props) {
                     ? () => navigation.navigate("QuestionManagement")
                     : feature.icon === "file-text"
                     ? () => navigation.navigate("ExamMainPage")
+                  : feature.icon === "book"
+                  ? () => navigation.navigate("LearningTools")
                     : undefined
                 }
               />
@@ -414,7 +433,13 @@ export default function HomeScreen({ navigation }: Props) {
       {/* User Menu */}
       <UserMenu
         visible={isUserMenuVisible}
-        user={currentUser}
+        user={{
+          user_id: "",
+          name: currentUserName,
+          email: "",
+          role: "student",
+          created_at: "",
+        }}
         notificationsEnabled={notificationsEnabled}
         onClose={() => setIsUserMenuVisible(false)}
         onNotificationsToggle={setNotificationsEnabled}

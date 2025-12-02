@@ -72,10 +72,7 @@ export default function BottomNavigation({
         navigation.navigate("Search");
         break;
       case "Study":
-        Alert.alert(
-          "Sắp có",
-          "Mục này sẽ được cập nhật trong phiên bản tới."
-        );
+        navigation.navigate("LearningTools");
         break;
       default:
         break;

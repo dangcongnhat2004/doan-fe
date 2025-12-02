@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, Alert, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Platform } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import ScreenHeader from "../../../components/ScreenHeader";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "./styles";
 import { getExams, ExamListItem } from "../../../api/examService";
 import { storage } from "../../../utils/storage";
@@ -14,12 +15,14 @@ import DashboardLayout from "../../../components/DashboardLayout";
 
 
 export default function ExamMainPage() {
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [exams, setExams] = useState<ExamListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [examProgress, setExamProgress] = useState<Map<string, number>>(new Map());
 
   const loadExams = useCallback(async () => {
     try {
@@ -39,6 +42,16 @@ export default function ExamMainPage() {
       });
       
       setExams(response.exams || []);
+
+      // Load progress for each exam from storage
+      const progressMap = new Map<string, number>();
+      for (const exam of response.exams || []) {
+        const savedProgress = await storage.getExamProgress(exam.exam_id);
+        if (savedProgress) {
+          progressMap.set(exam.exam_id, savedProgress.progress);
+        }
+      }
+      setExamProgress(progressMap);
     } catch (err: any) {
       console.error("Error loading exams:", err);
       setError(err.message || "Không thể tải danh sách đề thi. Vui lòng thử lại.");
@@ -51,6 +64,26 @@ export default function ExamMainPage() {
   useEffect(() => {
     loadExams();
   }, [loadExams]);
+
+  // Reload progress when screen is focused (when returning from exam screen)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      const reloadProgress = async () => {
+        if (exams.length === 0) return;
+        const progressMap = new Map<string, number>();
+        for (const exam of exams) {
+          const savedProgress = await storage.getExamProgress(exam.exam_id);
+          if (savedProgress) {
+            progressMap.set(exam.exam_id, savedProgress.progress);
+          }
+        }
+        setExamProgress(progressMap);
+      };
+      reloadProgress();
+    });
+
+    return unsubscribe;
+  }, [navigation, exams]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -69,6 +102,16 @@ export default function ExamMainPage() {
   const handleStartExam = (examId: string) => {
     // Navigate to exam doing page
     // This will be handled by ExamCard component
+  };
+
+  // Helper function to extract duration from description
+  const extractDuration = (description: string | null): number => {
+    if (!description) return 90; // Default duration
+    const durationMatch = description.match(/\[Duration:\s*(\d+)\s*minutes?\]/i);
+    if (durationMatch && durationMatch[1]) {
+      return parseInt(durationMatch[1], 10);
+    }
+    return 90; // Default duration if not found
   };
 
   // Calculate stats
@@ -101,23 +144,32 @@ export default function ExamMainPage() {
 
         <FlatList<ExamListItem>
           style={styles.listContainer}
+          contentContainerStyle={[
+            styles.listContentContainer,
+            { paddingBottom: Math.max(insets.bottom, 12) + 72 } // BottomNavigation height + safe area
+          ]}
           data={exams}
           keyExtractor={(item: ExamListItem) => item.exam_id}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
-          renderItem={({ item }: { item: ExamListItem }) => (
-            <ExamCard
-              examId={item.exam_id}
-              title={item.title}
-              createdAt={item.created_at}
-              questionCount={item.questions_count || 0} 
-              durationMinutes={90} // Default duration, can be updated if API provides it
-              status="published" // Default status, can be updated if API provides it
-              progress={0} // Default progress
-              onStart={() => handleStartExam(item.exam_id)}
-            />
-          )}
+          renderItem={({ item }: { item: ExamListItem }) => {
+            const savedProgress = examProgress.get(item.exam_id) || 0;
+            const isActive = savedProgress > 0 && savedProgress < 100;
+            const duration = extractDuration(item.description);
+            return (
+              <ExamCard
+                examId={item.exam_id}
+                title={item.title}
+                createdAt={item.created_at}
+                questionCount={item.questions_count || 0} 
+                durationMinutes={duration}
+                status={isActive ? "in-progress" : "published"} // Show as in-progress if has saved progress
+                progress={savedProgress}
+                onStart={() => handleStartExam(item.exam_id)}
+              />
+            );
+          }}
           ListHeaderComponent={
             <View>
               <WidgetTab
@@ -181,7 +233,7 @@ export default function ExamMainPage() {
 
   // Mobile Layout
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
         <ScreenHeader    
           title="Quản lý đề thi"
           functionIcon="settings"
@@ -199,6 +251,6 @@ export default function ExamMainPage() {
 
        {/* Bottom Navigation */}
       <BottomNavigation currentTab={'ExamMainPage'} />
-    </SafeAreaView>
+    </View>
   );
 }

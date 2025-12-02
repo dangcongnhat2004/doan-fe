@@ -12,6 +12,10 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
+  listContentContainer: {
+    paddingBottom: 100, // Default padding for BottomNavigation
+  },
+
   headerText: {
     marginTop: 10,
     fontSize: 18,

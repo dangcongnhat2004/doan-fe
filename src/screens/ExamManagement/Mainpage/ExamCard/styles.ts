@@ -70,13 +70,20 @@ const styles = StyleSheet.create({
 
   statusBadge: {
     marginTop: 12,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 4,
     paddingHorizontal: 8,
     alignSelf: "flex-start",
-    
+  },
+
+  activeBadge: {
+    borderColor: "#E8D5FF",
+    backgroundColor: "#F5F0FF",
+    marginTop: 0,
+    marginBottom: 8,
   },
 
   badgeText: {
@@ -84,6 +91,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.primary,
     textTransform: "capitalize",
+  },
+
+  activeBadgeText: {
+    color: "#8B5CF6",
   },
 
   progressRow: {

@@ -1,5 +1,6 @@
 import { Question } from "../types";
 import { SubmitExamResponse } from "../api/examService";
+import { QuestionDetail } from "../api/questionService";
 
 export type RootStackParamList = {
   Register: undefined;
@@ -76,4 +77,14 @@ export type RootStackParamList = {
     setId: string;
   };
   Search: undefined;
+  LearningTools: undefined;
+  FlashcardDetail: {
+    userId: string;
+    setId: string;
+  };
+  FlashcardSession: {
+    questions: QuestionDetail[];
+    setId: string;
+    title: string;
+  };
 };
