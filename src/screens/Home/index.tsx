@@ -696,9 +696,8 @@ const styles = StyleSheet.create({
   },
   webContentInner: {
     padding: 32,
-    maxWidth: 1400,
     width: "100%",
-    ...(Platform.OS === "web" ? ({ margin: "0 auto" } as any) : { alignSelf: "center" }),
+    ...(Platform.OS === "web" ? ({} as any) : { alignSelf: "center" }),
   },
   webWelcomeSection: {
     marginBottom: 32,

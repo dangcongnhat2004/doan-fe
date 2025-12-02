@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Platform,
   ScrollView,
@@ -11,11 +11,11 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
-import { getCurrentUser } from "../../api/mockData";
 import { COLORS } from "../../constants/colors";
 import { RootStackParamList } from "../../navigation/types";
 import Text from "../Text";
 import UserMenu from "../UserMenu";
+import { storage } from "../../utils/storage";
 
 type DashboardLayoutProps = {
   children: React.ReactNode;
@@ -33,6 +33,7 @@ export default function DashboardLayout({
   const [isUserMenuVisible, setIsUserMenuVisible] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [userName, setUserName] = useState<string>("Nguyễn Văn A");
 
   // Responsive breakpoints
   const { width } = useWindowDimensions();
@@ -40,8 +41,20 @@ export default function DashboardLayout({
   const isNarrow = Platform.OS === "web" && width >= 768 && width < 900;
   const sidebarWidth = isNarrow ? 72 : 240;
 
-  // Get current user from mock data
-  const currentUser = useMemo(() => getCurrentUser(), []);
+  // Load current user from storage (real login)
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const user = await storage.getUser();
+        if (user?.name) {
+          setUserName(user.name);
+        }
+      } catch {
+        // ignore, keep default
+      }
+    };
+    loadUser();
+  }, []);
 
   // Sidebar menu items
   const menuItems = [
@@ -176,7 +189,7 @@ export default function DashboardLayout({
                   <TouchableOpacity onPress={handleAvatarPress}>
                     <View style={styles.webUserAvatar}>
                       <Text style={styles.webUserAvatarText}>
-                        {currentUser.name
+                        {userName
                           .split(" ")
                           .map((n) => n[0])
                           .join("")
@@ -186,11 +199,9 @@ export default function DashboardLayout({
                   </TouchableOpacity>
                   <View style={styles.webUserInfo}>
                     <Text variant="bold" style={styles.webUserName}>
-                      {currentUser.name}
+                      {userName}
                     </Text>
-                    <Text style={styles.webUserRole}>
-                      {currentUser.role === "teacher" ? "Teacher Account" : "Student Account"}
-                    </Text>
+                    <Text style={styles.webUserRole}>Teacher Account</Text>
                   </View>
                 </View>
               </View>
@@ -208,7 +219,13 @@ export default function DashboardLayout({
           {/* User Menu */}
           <UserMenu
             visible={isUserMenuVisible}
-            user={currentUser}
+            user={{
+              user_id: "",
+              name: userName,
+              email: "",
+              role: "teacher",
+              created_at: "",
+            }}
             notificationsEnabled={notificationsEnabled}
             onClose={() => setIsUserMenuVisible(false)}
             onNotificationsToggle={setNotificationsEnabled}
@@ -286,7 +303,7 @@ export default function DashboardLayout({
             <TouchableOpacity onPress={handleAvatarPress}>
               <View style={styles.webUserAvatar}>
                 <Text style={styles.webUserAvatarText}>
-                  {currentUser.name
+                  {userName
                     .split(" ")
                     .map((n) => n[0])
                     .join("")
@@ -297,11 +314,9 @@ export default function DashboardLayout({
             {!isNarrow && (
               <View style={styles.webUserInfo}>
                 <Text variant="bold" style={styles.webUserName}>
-                  {currentUser.name}
+                  {userName}
                 </Text>
-                <Text style={styles.webUserRole}>
-                  {currentUser.role === "teacher" ? "Teacher Account" : "Student Account"}
-                </Text>
+                <Text style={styles.webUserRole}>Teacher Account</Text>
               </View>
             )}
           </View>
@@ -348,7 +363,13 @@ export default function DashboardLayout({
         {/* User Menu */}
         <UserMenu
           visible={isUserMenuVisible}
-          user={currentUser}
+          user={{
+            user_id: "",
+            name: userName,
+            email: "",
+            role: "teacher",
+            created_at: "",
+          }}
           notificationsEnabled={notificationsEnabled}
           onClose={() => setIsUserMenuVisible(false)}
           onNotificationsToggle={setNotificationsEnabled}
