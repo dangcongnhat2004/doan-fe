@@ -367,7 +367,7 @@ export default function DashboardLayout({
             user_id: "",
             name: userName,
             email: "",
-            role: "teacher",
+            role: "student",
             created_at: "",
           }}
           notificationsEnabled={notificationsEnabled}
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   webLogoSquare: {
     width: 40,
     height: 40,
-    backgroundColor: "#8B5CF6",
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
   },
   webMenuItemActive: {
-    backgroundColor: "#F3E8FF",
+    backgroundColor: "#E6F2FF",
   },
   webMenuIconSquare: {
     width: 20,
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
     } as any) : {}),
   },
   mobileDrawerItemActive: {
-    backgroundColor: "#F3E8FF",
+    backgroundColor: "#E6F2FF",
   },
   mobileDrawerItemText: {
     fontSize: 15,

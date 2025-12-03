@@ -1,10 +1,17 @@
 // Simple storage utility for token management
-// Web: dùng localStorage nếu có
-// Native (hiện tại): dùng in-memory (không persist sau khi kill app)
+// Web: dùng localStorage
+// iOS/Android: dùng AsyncStorage để persist data
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
 const TOKEN_KEY = "@auth_token";
 const USER_KEY = "@auth_user";
 
+// Helper to check if we're on web
+const isWeb = Platform.OS === "web";
+
+// In-memory fallback for native (only used if AsyncStorage fails)
 let tokenStorage: string | null = null;
 let userStorage: string | null = null;
 let examProgressStorage: Map<string, string> = new Map();
@@ -12,28 +19,50 @@ let examProgressStorage: Map<string, string> = new Map();
 export const storage = {
   // Token management
   async setToken(token: string): Promise<void> {
-    if (typeof window !== "undefined" && window.localStorage) {
+    if (isWeb && typeof window !== "undefined" && window.localStorage) {
       window.localStorage.setItem(TOKEN_KEY, token);
       tokenStorage = token;
       return;
     }
-    // Native fallback: in-memory only
-    tokenStorage = token;
+    // iOS/Android: use AsyncStorage
+    try {
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+      tokenStorage = token;
+    } catch (error) {
+      console.error("Error saving token to AsyncStorage:", error);
+      // Fallback to in-memory
+      tokenStorage = token;
+    }
   },
 
   async getToken(): Promise<string | null> {
-    if (typeof window !== "undefined" && window.localStorage) {
+    if (isWeb && typeof window !== "undefined" && window.localStorage) {
       const v = window.localStorage.getItem(TOKEN_KEY);
       tokenStorage = v;
       return v;
     }
-    // Native fallback
-    return tokenStorage;
+    // iOS/Android: use AsyncStorage
+    try {
+      const v = await AsyncStorage.getItem(TOKEN_KEY);
+      tokenStorage = v;
+      return v;
+    } catch (error) {
+      console.error("Error reading token from AsyncStorage:", error);
+      // Fallback to in-memory
+      return tokenStorage;
+    }
   },
 
   async removeToken(): Promise<void> {
-    if (typeof window !== "undefined" && window.localStorage) {
+    if (isWeb && typeof window !== "undefined" && window.localStorage) {
       window.localStorage.removeItem(TOKEN_KEY);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        await AsyncStorage.removeItem(TOKEN_KEY);
+      } catch (error) {
+        console.error("Error removing token from AsyncStorage:", error);
+      }
     }
     tokenStorage = null;
   },
@@ -42,21 +71,35 @@ export const storage = {
   async setUser(user: { id: string; name: string; email: string }): Promise<void> {
     const data = JSON.stringify(user);
 
-    if (typeof window !== "undefined" && window.localStorage) {
+    if (isWeb && typeof window !== "undefined" && window.localStorage) {
       window.localStorage.setItem(USER_KEY, data);
       userStorage = data;
       return;
     }
 
-    // Native fallback
-    userStorage = data;
+    // iOS/Android: use AsyncStorage
+    try {
+      await AsyncStorage.setItem(USER_KEY, data);
+      userStorage = data;
+    } catch (error) {
+      console.error("Error saving user to AsyncStorage:", error);
+      // Fallback to in-memory
+      userStorage = data;
+    }
   },
 
   async getUser(): Promise<{ id: string; name: string; email: string } | null> {
     let data: string | null = null;
 
-    if (typeof window !== "undefined" && window.localStorage) {
+    if (isWeb && typeof window !== "undefined" && window.localStorage) {
       data = window.localStorage.getItem(USER_KEY);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        data = await AsyncStorage.getItem(USER_KEY);
+      } catch (error) {
+        console.error("Error reading user from AsyncStorage:", error);
+      }
     }
 
     if (!data) data = userStorage;
@@ -72,8 +115,15 @@ export const storage = {
   },
 
   async removeUser(): Promise<void> {
-    if (typeof window !== "undefined" && window.localStorage) {
+    if (isWeb && typeof window !== "undefined" && window.localStorage) {
       window.localStorage.removeItem(USER_KEY);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        await AsyncStorage.removeItem(USER_KEY);
+      } catch (error) {
+        console.error("Error removing user from AsyncStorage:", error);
+      }
     }
     userStorage = null;
   },
@@ -84,7 +134,7 @@ export const storage = {
     await this.removeUser();
   },
 
-  // Exam progress management - using in-memory storage for mobile, localStorage for web
+  // Exam progress management - using AsyncStorage for iOS/Android, localStorage for web
   async setExamProgress(examId: string, progress: number, answers: Map<string, { choiceId: string | number; answeredAt: string }>): Promise<void> {
     const progressData = {
       examId,
@@ -99,11 +149,20 @@ export const storage = {
     const dataString = JSON.stringify(progressData);
     
     // For web, use localStorage
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(key, dataString);
+      return;
     }
-    // For mobile, use in-memory storage
-    examProgressStorage.set(key, dataString);
+    
+    // iOS/Android: use AsyncStorage
+    try {
+      await AsyncStorage.setItem(key, dataString);
+      examProgressStorage.set(key, dataString); // Keep in-memory as cache
+    } catch (error) {
+      console.error('Error saving exam progress to AsyncStorage:', error);
+      // Fallback to in-memory
+      examProgressStorage.set(key, dataString);
+    }
   },
 
   async getExamProgress(examId: string): Promise<{ progress: number; answers: Array<{ questionId: string; choiceId: string | number; answeredAt: string }> } | null> {
@@ -111,11 +170,21 @@ export const storage = {
     let data: string | null = null;
     
     // Try localStorage first (web)
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       data = window.localStorage.getItem(key);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        data = await AsyncStorage.getItem(key);
+        if (data) {
+          examProgressStorage.set(key, data); // Cache in memory
+        }
+      } catch (error) {
+        console.error('Error reading exam progress from AsyncStorage:', error);
+      }
     }
     
-    // Fallback to in-memory storage (mobile)
+    // Fallback to in-memory storage
     if (!data) {
       data = examProgressStorage.get(key) || null;
     }
@@ -139,14 +208,21 @@ export const storage = {
     const key = `@exam_progress_${examId}`;
     
     // Remove from localStorage (web)
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.removeItem(key);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        await AsyncStorage.removeItem(key);
+      } catch (error) {
+        console.error('Error removing exam progress from AsyncStorage:', error);
+      }
     }
-    // Remove from in-memory storage (mobile)
+    // Remove from in-memory storage
     examProgressStorage.delete(key);
   },
 
-  // Flashcard progress management - using in-memory storage for mobile, localStorage for web
+  // Flashcard progress management - using AsyncStorage for iOS/Android, localStorage for web
   async setFlashcardProgress(setId: string, rememberedCards: string[], notRememberedCards: string[]): Promise<void> {
     const progressData = {
       setId,
@@ -158,11 +234,20 @@ export const storage = {
     const dataString = JSON.stringify(progressData);
     
     // For web, use localStorage
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(key, dataString);
+      return;
     }
-    // For mobile, use in-memory storage
-    examProgressStorage.set(key, dataString);
+    
+    // iOS/Android: use AsyncStorage
+    try {
+      await AsyncStorage.setItem(key, dataString);
+      examProgressStorage.set(key, dataString); // Keep in-memory as cache
+    } catch (error) {
+      console.error('Error saving flashcard progress to AsyncStorage:', error);
+      // Fallback to in-memory
+      examProgressStorage.set(key, dataString);
+    }
   },
 
   async getFlashcardProgress(setId: string): Promise<{ rememberedCards: string[]; notRememberedCards: string[] } | null> {
@@ -170,11 +255,21 @@ export const storage = {
     let data: string | null = null;
     
     // Try localStorage first (web)
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       data = window.localStorage.getItem(key);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        data = await AsyncStorage.getItem(key);
+        if (data) {
+          examProgressStorage.set(key, data); // Cache in memory
+        }
+      } catch (error) {
+        console.error('Error reading flashcard progress from AsyncStorage:', error);
+      }
     }
     
-    // Fallback to in-memory storage (mobile)
+    // Fallback to in-memory storage
     if (!data) {
       data = examProgressStorage.get(key) || null;
     }
@@ -198,7 +293,7 @@ export const storage = {
     const results: Array<{ setId: string; rememberedCards: string[]; notRememberedCards: string[]; updatedAt: string }> = [];
     
     // Get from localStorage (web)
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
         if (key && key.startsWith('@flashcard_progress_')) {
@@ -215,19 +310,48 @@ export const storage = {
           }
         }
       }
+    } else {
+      // iOS/Android: get all keys from AsyncStorage
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const flashcardKeys = allKeys.filter(key => key.startsWith('@flashcard_progress_'));
+        const items = await AsyncStorage.multiGet(flashcardKeys);
+        
+        items.forEach(([key, value]) => {
+          if (value) {
+            try {
+              const data = JSON.parse(value);
+              results.push({
+                setId: data.setId,
+                rememberedCards: data.rememberedCards || [],
+                notRememberedCards: data.notRememberedCards || [],
+                updatedAt: data.updatedAt || '',
+              });
+              examProgressStorage.set(key, value); // Cache in memory
+            } catch (e) {
+              console.error('Error parsing flashcard progress:', e);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error reading all flashcard progress from AsyncStorage:', error);
+      }
     }
     
-    // Get from in-memory storage (mobile)
+    // Fallback: Get from in-memory storage
     examProgressStorage.forEach((value, key) => {
       if (key.startsWith('@flashcard_progress_')) {
         try {
           const data = JSON.parse(value);
-          results.push({
-            setId: data.setId,
-            rememberedCards: data.rememberedCards || [],
-            notRememberedCards: data.notRememberedCards || [],
-            updatedAt: data.updatedAt || '',
-          });
+          // Only add if not already in results
+          if (!results.find(r => r.setId === data.setId)) {
+            results.push({
+              setId: data.setId,
+              rememberedCards: data.rememberedCards || [],
+              notRememberedCards: data.notRememberedCards || [],
+              updatedAt: data.updatedAt || '',
+            });
+          }
         } catch (e) {
           console.error('Error parsing flashcard progress:', e);
         }
@@ -237,7 +361,7 @@ export const storage = {
     return results;
   },
 
-  // Whiteboard storage management
+  // Whiteboard storage management - using AsyncStorage for iOS/Android, localStorage for web
   async saveWhiteboard(whiteboardId: string, data: {
     paths: Array<{ d: string; stroke: string; strokeWidth: number; opacity?: number }>;
     backgroundColor: string;
@@ -248,11 +372,20 @@ export const storage = {
     const dataString = JSON.stringify(data);
     
     // For web, use localStorage
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(key, dataString);
+      return;
     }
-    // For mobile, use in-memory storage
-    examProgressStorage.set(key, dataString);
+    
+    // iOS/Android: use AsyncStorage
+    try {
+      await AsyncStorage.setItem(key, dataString);
+      examProgressStorage.set(key, dataString); // Keep in-memory as cache
+    } catch (error) {
+      console.error('Error saving whiteboard to AsyncStorage:', error);
+      // Fallback to in-memory
+      examProgressStorage.set(key, dataString);
+    }
   },
 
   async loadWhiteboard(whiteboardId: string): Promise<{
@@ -265,11 +398,21 @@ export const storage = {
     let data: string | null = null;
     
     // Try localStorage first (web)
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       data = window.localStorage.getItem(key);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        data = await AsyncStorage.getItem(key);
+        if (data) {
+          examProgressStorage.set(key, data); // Cache in memory
+        }
+      } catch (error) {
+        console.error('Error reading whiteboard from AsyncStorage:', error);
+      }
     }
     
-    // Fallback to in-memory storage (mobile)
+    // Fallback to in-memory storage
     if (!data) {
       data = examProgressStorage.get(key) || null;
     }
@@ -289,7 +432,7 @@ export const storage = {
     const results: Array<{ id: string; updatedAt: string }> = [];
     
     // Get from localStorage (web)
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
         if (key && key.startsWith('@whiteboard_')) {
@@ -305,18 +448,46 @@ export const storage = {
           }
         }
       }
+    } else {
+      // iOS/Android: get all keys from AsyncStorage
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const whiteboardKeys = allKeys.filter(key => key.startsWith('@whiteboard_'));
+        const items = await AsyncStorage.multiGet(whiteboardKeys);
+        
+        items.forEach(([key, value]) => {
+          if (value) {
+            try {
+              const data = JSON.parse(value);
+              const id = key.replace('@whiteboard_', '');
+              results.push({
+                id,
+                updatedAt: data.updatedAt || '',
+              });
+              examProgressStorage.set(key, value); // Cache in memory
+            } catch (e) {
+              console.error('Error parsing whiteboard:', e);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error reading all whiteboards from AsyncStorage:', error);
+      }
     }
     
-    // Get from in-memory storage (mobile)
+    // Fallback: Get from in-memory storage
     examProgressStorage.forEach((value, key) => {
       if (key.startsWith('@whiteboard_')) {
         try {
           const data = JSON.parse(value);
           const id = key.replace('@whiteboard_', '');
-          results.push({
-            id,
-            updatedAt: data.updatedAt || '',
-          });
+          // Only add if not already in results
+          if (!results.find(r => r.id === id)) {
+            results.push({
+              id,
+              updatedAt: data.updatedAt || '',
+            });
+          }
         } catch (e) {
           console.error('Error parsing whiteboard:', e);
         }
@@ -330,10 +501,17 @@ export const storage = {
     const key = `@whiteboard_${whiteboardId}`;
     
     // Remove from localStorage (web)
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (isWeb && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.removeItem(key);
+    } else {
+      // iOS/Android: use AsyncStorage
+      try {
+        await AsyncStorage.removeItem(key);
+      } catch (error) {
+        console.error('Error removing whiteboard from AsyncStorage:', error);
+      }
     }
-    // Remove from in-memory storage (mobile)
+    // Remove from in-memory storage
     examProgressStorage.delete(key);
   },
 };

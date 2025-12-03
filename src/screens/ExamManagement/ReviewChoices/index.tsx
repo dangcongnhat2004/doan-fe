@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Animated } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather as Icon, MaterialIcons as IconMaterial } from '@expo/vector-icons';
 import { COLORS } from '../../../constants/colors';
 import { styles } from './styles';
@@ -23,6 +24,7 @@ export default function ReviewExamScreen({ navigation, route }: Props) {
   const [confirmScaleAnim] = useState(new Animated.Value(0));
   const [warningScaleAnim] = useState(new Animated.Value(0));
   const hasResult = !!examResult;
+  const insets = useSafeAreaInsets();
 
   // Create a map of answers from examResult for quick lookup
   // Use useMemo to ensure it updates when examResult changes
@@ -290,9 +292,9 @@ export default function ReviewExamScreen({ navigation, route }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <TouchableOpacity onPress={() => navigation.navigate('ExamMainPage')}>
           <Icon name="arrow-left" size={24} color={COLORS.black} />
         </TouchableOpacity>
@@ -336,7 +338,7 @@ export default function ReviewExamScreen({ navigation, route }: Props) {
         data={reviewData}
         keyExtractor={item => item.question_id}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: 16, paddingBottom: 90 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 90 + insets.bottom }}
         extraData={examResult} // Force re-render when examResult changes
         ListHeaderComponent={
           hasResult ? (
@@ -348,7 +350,7 @@ export default function ReviewExamScreen({ navigation, route }: Props) {
       />
 
       {/* Footer */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         {!hasResult ? (
           <>
             <TouchableOpacity
@@ -561,6 +563,6 @@ export default function ReviewExamScreen({ navigation, route }: Props) {
           </Animated.View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }

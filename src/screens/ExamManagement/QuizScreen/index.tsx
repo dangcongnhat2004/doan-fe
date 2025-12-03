@@ -27,6 +27,8 @@ export default function ExamDoingPage({ route, navigation }: Props) {
   const [startedAt, setStartedAt] = useState<string>(new Date().toISOString());
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [showResultScreen, setShowResultScreen] = useState(false);
+  const [submittedResult, setSubmittedResult] = useState<{ score: number; correct_answers: number; total_questions: number } | null>(null);
 
   const toggleMenu = useCallback(() => {
     setVisible(prev => !prev);
@@ -160,19 +162,31 @@ export default function ExamDoingPage({ route, navigation }: Props) {
                     });
                     // Clear progress from storage after successful submission
                     await storage.removeExamProgress(examId);
-                    const reviewDataWithAnswers = questions.map(q => {
-                      const answer = answers.get(q.question_id);
-                      return {
-                        ...q,
-                        is_selected: answer ? answer.choiceId : null,
-                      };
+                    
+                    // Show result screen with 100% progress and score
+                    setSubmittedResult({
+                      score: emptyResult.score,
+                      correct_answers: emptyResult.correct_answers,
+                      total_questions: emptyResult.total_questions,
                     });
-                    navigation.navigate('ReviewExam', {
-                      reviewData: reviewDataWithAnswers,
-                      examResult: emptyResult,
-                      examId: examId,
-                      startedAt: startedAt,
-                    });
+                    setShowResultScreen(true);
+
+                    // Auto navigate to review screen after 3 seconds
+                    setTimeout(() => {
+                      const reviewDataWithAnswers = questions.map(q => {
+                        const answer = answers.get(q.question_id);
+                        return {
+                          ...q,
+                          is_selected: answer ? answer.choiceId : null,
+                        };
+                      });
+                      navigation.navigate('ReviewExam', {
+                        reviewData: reviewDataWithAnswers,
+                        examResult: emptyResult,
+                        examId: examId,
+                        startedAt: startedAt,
+                      });
+                    }, 3000);
                   } catch (err: any) {
                     console.error("Error submitting exam:", err);
                     setTimeout(() => {
@@ -198,20 +212,31 @@ export default function ExamDoingPage({ route, navigation }: Props) {
       // Clear progress from storage after successful submission
       await storage.removeExamProgress(examId);
 
-      const reviewDataWithAnswers = questions.map(q => {
-        const answer = answers.get(q.question_id);
-        return {
-          ...q,
-          is_selected: answer ? answer.choiceId : null,
-        };
+      // Show result screen with 100% progress and score
+      setSubmittedResult({
+        score: result.score,
+        correct_answers: result.correct_answers,
+        total_questions: result.total_questions,
       });
-      
-      navigation.navigate('ReviewExam', {
-        reviewData: reviewDataWithAnswers,
-        examResult: result,
-        examId: examId,
-        startedAt: startedAt,
-      });
+      setShowResultScreen(true);
+
+      // Auto navigate to review screen after 3 seconds
+      setTimeout(() => {
+        const reviewDataWithAnswers = questions.map(q => {
+          const answer = answers.get(q.question_id);
+          return {
+            ...q,
+            is_selected: answer ? answer.choiceId : null,
+          };
+        });
+        
+        navigation.navigate('ReviewExam', {
+          reviewData: reviewDataWithAnswers,
+          examResult: result,
+          examId: examId,
+          startedAt: startedAt,
+        });
+      }, 3000);
     } catch (err: any) {
       console.error("Error submitting exam:", err);
       setTimeout(() => {
@@ -483,6 +508,54 @@ export default function ExamDoingPage({ route, navigation }: Props) {
         onCancel={() => setShowExitModal(false)}
         onConfirm={performExitExam}
       />
+
+      {/* Result Screen Overlay */}
+      {showResultScreen && submittedResult && (
+        <View style={styles.resultOverlay}>
+          <View style={styles.resultContainer}>
+            <View style={styles.resultIconContainer}>
+              <Icon name="check-circle" size={80} color="#4CAF50" />
+            </View>
+            <Text style={styles.resultTitle}>Hoàn thành!</Text>
+            <Text style={styles.resultSubtitle}>Bạn đã nộp bài thi thành công</Text>
+            
+            {/* Progress Bar */}
+            <View style={styles.resultProgressContainer}>
+              <View style={styles.resultProgressBar}>
+                <View style={[styles.resultProgressFill, { width: '100%' }]} />
+              </View>
+              <Text style={styles.resultProgressText}>100%</Text>
+            </View>
+
+            {/* Score */}
+            <View style={styles.resultScoreContainer}>
+              <Text style={styles.resultScoreLabel}>Điểm số</Text>
+              <Text style={styles.resultScoreValue}>
+                {submittedResult.score.toFixed(1)}
+                <Text style={styles.resultScoreMax}> / 100</Text>
+              </Text>
+            </View>
+
+            {/* Stats */}
+            <View style={styles.resultStatsContainer}>
+              <View style={styles.resultStatItem}>
+                <Text style={styles.resultStatValue}>{submittedResult.correct_answers}</Text>
+                <Text style={styles.resultStatLabel}>Câu đúng</Text>
+              </View>
+              <View style={styles.resultStatItem}>
+                <Text style={styles.resultStatValue}>{submittedResult.total_questions - submittedResult.correct_answers}</Text>
+                <Text style={styles.resultStatLabel}>Câu sai</Text>
+              </View>
+              <View style={styles.resultStatItem}>
+                <Text style={styles.resultStatValue}>{submittedResult.total_questions}</Text>
+                <Text style={styles.resultStatLabel}>Tổng câu</Text>
+              </View>
+            </View>
+
+            <Text style={styles.resultLoadingText}>Đang chuyển đến màn hình kết quả...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

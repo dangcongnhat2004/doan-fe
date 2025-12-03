@@ -80,8 +80,8 @@ const styles = StyleSheet.create({
   },
 
   activeBadge: {
-    borderColor: "#E8D5FF",
-    backgroundColor: "#F5F0FF",
+    borderColor: "#D6E8FF",
+    backgroundColor: "#E6F2FF",
     marginTop: 0,
     marginBottom: 8,
   },
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   },
 
   activeBadgeText: {
-    color: "#8B5CF6",
+    color: COLORS.primary,
   },
 
   progressRow: {

@@ -130,13 +130,30 @@ export default function UploadScreen({ navigation }: Props) {
         throw { message: "Đã hủy" } as any;
       }
 
+      // Log job_id for debugging
+      console.log("📤 Upload complete! Job ID:", uploadResponse.job_id);
+      console.log("📤 Upload response:", JSON.stringify(uploadResponse, null, 2));
+
       // Upload complete, move to processing phase
       setProcessingProgress(50);
       setProcessingMessage("Đang trong quá trình trích xuất câu hỏi...");
 
+      // IMPORTANT: Wait 2 seconds after upload before starting to poll
+      // Lambda runs async and needs time to save result to DB
+      // Based on your test: upload takes 13.63s, but Lambda processing might need extra time
+      console.log("⏳ Waiting 2 seconds for Lambda to process and save to DB...");
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 2000);
+      });
+
+      // Check if cancelled during wait
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
+
       // Step 2: Start polling for results (50% - 95%)
       // Polling sẽ return ngay khi có kết quả, nhưng progress sẽ tăng dần dựa trên thời gian
-      const maxAttempts = 90;
+      const maxAttempts = 120; // Tăng lên 120 để cover trường hợp chậm hơn
       const pollingStartProgress = 50;
       const pollingEndProgress = 95;
       const processingStartTime = Date.now();
@@ -171,7 +188,7 @@ export default function UploadScreen({ navigation }: Props) {
           return false; // Continue polling
         },
         maxAttempts,
-        1000 // 1 second interval
+        300 // Giảm xuống 300ms base interval (sẽ được override bởi dynamic interval)
       );
 
       // Check if cancelled after polling

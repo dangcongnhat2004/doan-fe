@@ -87,4 +87,5 @@ export type RootStackParamList = {
     setId: string;
     title: string;
   };
+  FlashcardWhiteboard: undefined;
 };

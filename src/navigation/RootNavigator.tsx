@@ -17,6 +17,7 @@ import SearchScreen from "../screens/Search";
 import LearningToolsScreen from "../screens/LearningTools";
 import FlashcardDetailScreen from "../screens/FlashcardDetail";
 import FlashcardSessionScreen from "../screens/FlashcardSession";
+import FlashcardWhiteboardScreen from "../screens/FlashcardWhiteboard";
 import { storage } from "../utils/storage";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -126,6 +127,11 @@ export default function RootNavigator() {
         <Stack.Screen
           name="FlashcardSession"
           component={FlashcardSessionScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="FlashcardWhiteboard"
+          component={FlashcardWhiteboardScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

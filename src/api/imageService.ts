@@ -862,17 +862,40 @@ export const getImageResult = async (
 export const pollImageResult = async (
   jobId: string,
   onProgress?: (attempt: number, maxAttempts: number) => boolean | void,
-  maxAttempts: number = 90,
-  intervalMs: number = 1000
+  maxAttempts: number = 120,
+  intervalMs: number = 300
 ): Promise<ImageResultResponse> => {
-  // Dynamic interval: start with 500ms, gradually increase to intervalMs
-  // This allows faster initial checks while server is processing
+  // Dynamic interval: start very fast, gradually increase
+  // Based on your test: API only takes 393ms, so we check very frequently
+  // After 2s delay from upload, result should be ready quickly
   const getCurrentInterval = (attempt: number): number => {
-    if (attempt <= 5) return 500; // First 5 attempts: 500ms (very fast)
-    if (attempt <= 15) return 800; // Next 10 attempts: 800ms (fast)
-    return intervalMs; // After that: use normal interval (1000ms)
+    if (attempt <= 10) return 300; // First 10 attempts: 300ms (very fast - covers ~3s)
+    if (attempt <= 30) return 500; // Next 20 attempts: 500ms (fast - covers ~10s more)
+    if (attempt <= 60) return 800; // Next 30 attempts: 800ms (medium - covers ~24s more)
+    return 1000; // After that: 1 second
   };
 
+  // IMMEDIATE CHECK: Check right away (after the 2s delay from upload)
+  // This catches cases where result is ready immediately
+  try {
+    const immediateResult = await getImageResult(jobId);
+    const hasItems = immediateResult.data && 
+                    immediateResult.data.items && 
+                    Array.isArray(immediateResult.data.items) && 
+                    immediateResult.data.items.length > 0;
+    const hasItemsCount = immediateResult.data?.items_count && immediateResult.data.items_count > 0;
+    
+    if (hasItems || hasItemsCount) {
+      console.log(`✅ Result ready immediately (0 attempts)!`);
+      return immediateResult;
+    }
+  } catch (error: any) {
+    // If immediate check fails (404, etc.), continue with polling
+    // This is expected - result might not be ready yet
+    console.log(`⏳ Result not ready yet (404 expected), starting polling...`);
+  }
+
+  // Start polling loop
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const result = await getImageResult(jobId);
