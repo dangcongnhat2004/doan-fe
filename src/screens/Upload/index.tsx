@@ -77,22 +77,41 @@ export default function UploadScreen({ navigation }: Props) {
     // Create new AbortController for this upload
     uploadAbortControllerRef.current = new AbortController();
 
+    // Track start time for smooth progress calculation
+    const startTime = Date.now();
+    // Minimum time for smooth progress (18 seconds based on your test: 13.44s upload + ~4-5s processing)
+    const MIN_PROCESSING_TIME = 18000; // 18 seconds
+    const UPLOAD_PHASE_TIME = 14000; // ~14 seconds for upload (based on your 13.44s test)
+    const PROCESSING_PHASE_TIME = 4000; // ~4 seconds for processing
+
     try {
       // Check if cancelled before starting
       if (pollingAbortRef.current) {
         throw { message: "Đã hủy" } as any;
       }
 
-      // Step 1: Upload image (0% - 20%)
+      // Step 1: Upload image (0% - 50%)
       if (retryCount > 0) {
         setProcessingMessage(`Đang thử lại lần ${retryCount + 1}...`);
       } else {
         setProcessingMessage("Đang tải ảnh lên server...");
       }
-      setProcessingProgress(10);
+
+      // Animate progress during upload (0% -> 50%)
+      const uploadStartTime = Date.now();
+      const uploadProgressInterval = setInterval(() => {
+        if (pollingAbortRef.current) {
+          clearInterval(uploadProgressInterval);
+          return;
+        }
+        const elapsed = Date.now() - uploadStartTime;
+        const uploadProgress = Math.min(50, (elapsed / UPLOAD_PHASE_TIME) * 50);
+        setProcessingProgress(uploadProgress);
+      }, 100); // Update every 100ms for smooth animation
 
       // Check if cancelled before upload
       if (pollingAbortRef.current) {
+        clearInterval(uploadProgressInterval);
         throw { message: "Đã hủy" } as any;
       }
 
@@ -104,21 +123,26 @@ export default function UploadScreen({ navigation }: Props) {
         uploadAbortControllerRef.current.signal
       );
 
+      clearInterval(uploadProgressInterval);
+
       // Check if cancelled after upload
       if (pollingAbortRef.current) {
         throw { message: "Đã hủy" } as any;
       }
 
       // Upload complete, move to processing phase
-      setProcessingProgress(20);
+      setProcessingProgress(50);
       setProcessingMessage("Đang trong quá trình trích xuất câu hỏi...");
 
-      // Step 2: Start polling for results (20% - 95%)
-      // Tăng maxAttempts lên 90 để đợi lâu hơn, nhưng vẫn return ngay khi có kết quả
+      // Step 2: Start polling for results (50% - 95%)
+      // Polling sẽ return ngay khi có kết quả, nhưng progress sẽ tăng dần dựa trên thời gian
       const maxAttempts = 90;
-      const pollingStartProgress = 20;
+      const pollingStartProgress = 50;
       const pollingEndProgress = 95;
-      const progressRange = pollingEndProgress - pollingStartProgress;
+      const processingStartTime = Date.now();
+      
+      // Track current progress for smooth animation
+      let currentProgressValue = 50;
 
       const result = await pollImageResult(
         uploadResponse.job_id,
@@ -127,15 +151,27 @@ export default function UploadScreen({ navigation }: Props) {
           if (pollingAbortRef.current) {
             return true; // Signal to stop polling
           }
-          // Calculate progress: 20% + (attempt/maxAttempts) * 75%
-          const pollingProgress = (attempt / maxAttempts) * progressRange;
-          const totalProgress = pollingStartProgress + pollingProgress;
-          setProcessingProgress(Math.min(totalProgress, pollingEndProgress));
+          
+          // Calculate progress based on elapsed time, not attempt count
+          // This ensures smooth progress even if result comes early
+          const elapsed = Date.now() - processingStartTime;
+          const timeBasedProgress = Math.min(
+            pollingEndProgress,
+            pollingStartProgress + (elapsed / PROCESSING_PHASE_TIME) * (pollingEndProgress - pollingStartProgress)
+          );
+          
+          // Also consider minimum time - don't let progress go too fast
+          const minTimeProgress = pollingStartProgress + (elapsed / MIN_PROCESSING_TIME) * (pollingEndProgress - pollingStartProgress);
+          
+          // Use the slower of the two to ensure smooth progress
+          const finalProgress = Math.min(timeBasedProgress, minTimeProgress);
+          currentProgressValue = finalProgress;
+          setProcessingProgress(finalProgress);
           setProcessingMessage("Đang trong quá trình trích xuất câu hỏi...");
           return false; // Continue polling
         },
         maxAttempts,
-        1000 // Giảm xuống 1 giây để check nhanh hơn
+        1000 // 1 second interval
       );
 
       // Check if cancelled after polling
@@ -143,12 +179,43 @@ export default function UploadScreen({ navigation }: Props) {
         throw { message: "Đã hủy" } as any;
       }
 
-      // Check if cancelled before final steps
-      if (pollingAbortRef.current) {
-        throw { message: "Đã hủy" } as any;
+      // Step 3: Smooth animation from current progress to 100%
+      // Ensure minimum time has passed for smooth UX
+      const totalElapsed = Date.now() - startTime;
+      const remainingTime = Math.max(0, MIN_PROCESSING_TIME - totalElapsed);
+      
+      if (remainingTime > 0) {
+        // Continue animating progress while waiting for minimum time
+        const remainingProgress = 95 - currentProgressValue;
+        const animationSteps = Math.ceil(remainingTime / 100); // Update every 100ms
+        const progressPerStep = remainingProgress / animationSteps;
+        
+        for (let i = 0; i < animationSteps; i++) {
+          if (pollingAbortRef.current) {
+            throw { message: "Đã hủy" } as any;
+          }
+          currentProgressValue += progressPerStep;
+          setProcessingProgress(Math.min(currentProgressValue, 95));
+          await new Promise<void>((resolve) => setTimeout(() => resolve(), 100));
+        }
       }
 
-      // Step 3: Processing complete (95% - 100%)
+      // Final smooth animation to 95%
+      const targetProgress = 95;
+      const animationDuration = 800; // 0.8 seconds to animate to 95%
+      const animationStartTime = Date.now();
+      const startProgress = currentProgressValue;
+
+      while (Date.now() - animationStartTime < animationDuration) {
+        if (pollingAbortRef.current) {
+          throw { message: "Đã hủy" } as any;
+        }
+        const elapsed = Date.now() - animationStartTime;
+        const progress = startProgress + ((targetProgress - startProgress) * (elapsed / animationDuration));
+        setProcessingProgress(Math.min(progress, targetProgress));
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), 50));
+      }
+
       setProcessingProgress(95);
       setProcessingMessage("Đang hoàn tất...");
 
@@ -160,6 +227,19 @@ export default function UploadScreen({ navigation }: Props) {
       // Check again after delay
       if (pollingAbortRef.current) {
         throw { message: "Đã hủy" } as any;
+      }
+
+      // Final smooth animation to 100%
+      const finalAnimationDuration = 500;
+      const finalStartTime = Date.now();
+      while (Date.now() - finalStartTime < finalAnimationDuration) {
+        if (pollingAbortRef.current) {
+          throw { message: "Đã hủy" } as any;
+        }
+        const elapsed = Date.now() - finalStartTime;
+        const progress = 95 + (5 * (elapsed / finalAnimationDuration));
+        setProcessingProgress(Math.min(progress, 100));
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), 50));
       }
 
       setProcessingProgress(100);
