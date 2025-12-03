@@ -82,7 +82,8 @@ export const uploadImage = async (
   imageUri: string,
   imageName: string,
   imageType: string,
-  fileSize?: number
+  fileSize?: number,
+  abortSignal?: AbortSignal
 ): Promise<UploadImageResponse> => {
   const token = await storage.getToken();
   if (!token) {
@@ -279,8 +280,26 @@ export const uploadImage = async (
     console.log("Token length:", token?.length || 0);
     
     // Use fetch() for all platforms (same as login) - it handles FormData well on React Native
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 seconds for uploads
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 120000); // 120 seconds for uploads
+    
+    // Combine abort signals: user cancellation + timeout
+    let finalSignal: AbortSignal;
+    if (abortSignal) {
+      const combinedController = new AbortController();
+      // Listen to user abort signal
+      abortSignal.addEventListener('abort', () => {
+        combinedController.abort();
+        clearTimeout(timeoutId);
+      });
+      // Listen to timeout abort signal
+      timeoutController.signal.addEventListener('abort', () => {
+        combinedController.abort();
+      });
+      finalSignal = combinedController.signal;
+    } else {
+      finalSignal = timeoutController.signal;
+    }
     
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -329,7 +348,7 @@ export const uploadImage = async (
       method: "POST",
       headers: headers,
       body: formData,
-      signal: controller.signal,
+      signal: finalSignal,
     });
     
     clearTimeout(timeoutId);
@@ -842,28 +861,53 @@ export const getImageResult = async (
  */
 export const pollImageResult = async (
   jobId: string,
-  onProgress?: (attempt: number, maxAttempts: number) => void,
-  maxAttempts: number = 30,
-  intervalMs: number = 2000
+  onProgress?: (attempt: number, maxAttempts: number) => boolean | void,
+  maxAttempts: number = 90,
+  intervalMs: number = 1000
 ): Promise<ImageResultResponse> => {
+  // Dynamic interval: start with 500ms, gradually increase to intervalMs
+  // This allows faster initial checks while server is processing
+  const getCurrentInterval = (attempt: number): number => {
+    if (attempt <= 5) return 500; // First 5 attempts: 500ms (very fast)
+    if (attempt <= 15) return 800; // Next 10 attempts: 800ms (fast)
+    return intervalMs; // After that: use normal interval (1000ms)
+  };
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const result = await getImageResult(jobId);
 
       // Check if result has items (processing completed)
-      if (result.data && result.data.items && Array.isArray(result.data.items) && result.data.items.length > 0) {
+      // Also check items_count > 0 as backup check
+      const hasItems = result.data && 
+                      result.data.items && 
+                      Array.isArray(result.data.items) && 
+                      result.data.items.length > 0;
+      
+      const hasItemsCount = result.data?.items_count && result.data.items_count > 0;
+
+      if (hasItems || hasItemsCount) {
+        console.log(`✅ Result ready after ${attempt} attempts!`);
         return result;
       }
 
       // If no items yet, continue polling
+      // onProgress can return true to signal abort
       if (onProgress) {
-        onProgress(attempt, maxAttempts);
+        const shouldAbort = onProgress(attempt, maxAttempts);
+        if (shouldAbort === true) {
+          throw {
+            message: "Đã hủy",
+          } as ApiError;
+        }
       }
 
       // Wait before next attempt (except for last attempt)
+      // Use dynamic interval for faster initial checks
       if (attempt < maxAttempts) {
+        const currentInterval = getCurrentInterval(attempt);
         await new Promise<void>((resolve) => {
-          setTimeout(() => resolve(), intervalMs);
+          setTimeout(() => resolve(), currentInterval);
         });
       }
     } catch (error: any) {
@@ -886,7 +930,12 @@ export const pollImageResult = async (
         const errorType = isNetworkError ? "Network error" : "404 (job not ready)";
         console.warn(`⚠️ ${errorType} on attempt ${attempt}/${maxAttempts}. Will retry...`);
         if (onProgress) {
-          onProgress(attempt, maxAttempts);
+          const shouldAbort = onProgress(attempt, maxAttempts);
+          if (shouldAbort === true) {
+            throw {
+              message: "Đã hủy",
+            } as ApiError;
+          }
         }
         if (attempt < maxAttempts) {
           // Wait a bit longer on network error before retrying
@@ -903,7 +952,12 @@ export const pollImageResult = async (
       if (attempt < maxAttempts - 5) { // Allow 5 more attempts even on non-network errors
         console.warn(`⚠️ Error on attempt ${attempt}/${maxAttempts}: ${error.message}. Will retry...`);
         if (onProgress) {
-          onProgress(attempt, maxAttempts);
+          const shouldAbort = onProgress(attempt, maxAttempts);
+          if (shouldAbort === true) {
+            throw {
+              message: "Đã hủy",
+            } as ApiError;
+          }
         }
         await new Promise<void>((resolve) => {
           setTimeout(() => resolve(), intervalMs);
@@ -917,6 +971,8 @@ export const pollImageResult = async (
   }
 
   // If we've exhausted all attempts
+  // This should rarely happen since we return immediately when result is ready
+  console.error(`❌ Polling exhausted after ${maxAttempts} attempts (${(maxAttempts * intervalMs) / 1000}s)`);
   throw {
     message: "Xử lý ảnh mất quá nhiều thời gian. Vui lòng thử lại sau.",
   } as ApiError;

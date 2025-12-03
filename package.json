@@ -11,6 +11,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "build:web": "expo export:web",
+    "export": "expo export && node fix-dist-css.js",
     "serve:dist": "npx serve dist -s -l 3000",
     "lint": "expo lint"
   },

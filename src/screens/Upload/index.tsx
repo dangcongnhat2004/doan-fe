@@ -36,6 +36,7 @@ export default function UploadScreen({ navigation }: Props) {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState("Đang xử lý ảnh...");
   const pollingAbortRef = useRef<boolean>(false);
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
 
   const handleFileUpload = async () => {
     try {
@@ -72,8 +73,16 @@ export default function UploadScreen({ navigation }: Props) {
     setIsProcessing(true);
     setProcessingProgress(0);
     pollingAbortRef.current = false;
+    
+    // Create new AbortController for this upload
+    uploadAbortControllerRef.current = new AbortController();
 
     try {
+      // Check if cancelled before starting
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
+
       // Step 1: Upload image (0% - 20%)
       if (retryCount > 0) {
         setProcessingMessage(`Đang thử lại lần ${retryCount + 1}...`);
@@ -82,19 +91,31 @@ export default function UploadScreen({ navigation }: Props) {
       }
       setProcessingProgress(10);
 
+      // Check if cancelled before upload
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
+
       const uploadResponse = await uploadImage(
         file.uri,
         file.name,
         file.type,
-        file.size
+        file.size,
+        uploadAbortControllerRef.current.signal
       );
+
+      // Check if cancelled after upload
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
 
       // Upload complete, move to processing phase
       setProcessingProgress(20);
       setProcessingMessage("Đang trong quá trình trích xuất câu hỏi...");
 
       // Step 2: Start polling for results (20% - 95%)
-      const maxAttempts = 30;
+      // Tăng maxAttempts lên 90 để đợi lâu hơn, nhưng vẫn return ngay khi có kết quả
+      const maxAttempts = 90;
       const pollingStartProgress = 20;
       const pollingEndProgress = 95;
       const progressRange = pollingEndProgress - pollingStartProgress;
@@ -102,17 +123,30 @@ export default function UploadScreen({ navigation }: Props) {
       const result = await pollImageResult(
         uploadResponse.job_id,
         (attempt, maxAttempts) => {
-          if (!pollingAbortRef.current) {
-            // Calculate progress: 20% + (attempt/maxAttempts) * 75%
-            const pollingProgress = (attempt / maxAttempts) * progressRange;
-            const totalProgress = pollingStartProgress + pollingProgress;
-            setProcessingProgress(Math.min(totalProgress, pollingEndProgress));
-            setProcessingMessage("Đang trong quá trình trích xuất câu hỏi...");
+          // Check abort before updating progress
+          if (pollingAbortRef.current) {
+            return true; // Signal to stop polling
           }
+          // Calculate progress: 20% + (attempt/maxAttempts) * 75%
+          const pollingProgress = (attempt / maxAttempts) * progressRange;
+          const totalProgress = pollingStartProgress + pollingProgress;
+          setProcessingProgress(Math.min(totalProgress, pollingEndProgress));
+          setProcessingMessage("Đang trong quá trình trích xuất câu hỏi...");
+          return false; // Continue polling
         },
         maxAttempts,
-        2000 // 2 seconds interval
+        1000 // Giảm xuống 1 giây để check nhanh hơn
       );
+
+      // Check if cancelled after polling
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
+
+      // Check if cancelled before final steps
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
 
       // Step 3: Processing complete (95% - 100%)
       setProcessingProgress(95);
@@ -123,6 +157,11 @@ export default function UploadScreen({ navigation }: Props) {
         setTimeout(() => resolve(), 300);
       });
 
+      // Check again after delay
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
+
       setProcessingProgress(100);
       setProcessingMessage("Hoàn thành!");
 
@@ -130,6 +169,11 @@ export default function UploadScreen({ navigation }: Props) {
       await new Promise<void>((resolve) => {
         setTimeout(() => resolve(), 500);
       });
+
+      // Final check before navigation
+      if (pollingAbortRef.current) {
+        throw { message: "Đã hủy" } as any;
+      }
 
       // Step 4: Navigate to ReviewQuestions with extracted data
       const questions = result.data.items.map(
@@ -171,6 +215,15 @@ export default function UploadScreen({ navigation }: Props) {
         questions: questions,
       });
     } catch (error: any) {
+      // If cancelled, don't show error, just reset state
+      if (error.message === "Đã hủy" || pollingAbortRef.current) {
+        setIsUploading(false);
+        setIsProcessing(false);
+        setProcessingProgress(0);
+        setSelectedFile(null);
+        return; // Exit silently
+      }
+
       // Provide more specific error messages
       let errorMessage = "Có lỗi xảy ra. Vui lòng thử lại.";
 
@@ -246,9 +299,19 @@ export default function UploadScreen({ navigation }: Props) {
   };
 
   const handleCancelProcessing = () => {
+    // Set abort flag
     pollingAbortRef.current = true;
+    
+    // Abort upload request if it's still running
+    if (uploadAbortControllerRef.current) {
+      uploadAbortControllerRef.current.abort();
+      uploadAbortControllerRef.current = null;
+    }
+    
+    // Reset state
     setIsUploading(false);
     setIsProcessing(false);
+    setProcessingProgress(0);
     setSelectedFile(null);
   };
 

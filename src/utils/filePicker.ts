@@ -123,24 +123,40 @@ export const pickFile = async (): Promise<FileResult | null> => {
 
 // Take photo from camera
 export const takePhoto = async (): Promise<FileResult | null> => {
-  const granted = await requestPermission(
-    ImagePicker.requestCameraPermissionsAsync,
-    "camera"
-  );
-  if (!granted) {
-    return null;
+  try {
+    const granted = await requestPermission(
+      ImagePicker.requestCameraPermissionsAsync,
+      "camera"
+    );
+    if (!granted) {
+      return null;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets || !result.assets[0]?.uri) {
+      return null;
+    }
+
+    const mapped = mapAssetToFile(result.assets[0]);
+
+    if (!mapped) {
+      throw new Error("Không lấy được thông tin file ảnh từ camera.");
+    }
+
+    return mapped;
+  } catch (error) {
+    console.error("takePhoto error:", error);
+    // Để màn hình Upload hiển thị Alert thân thiện
+    throw error instanceof Error
+      ? error
+      : new Error("Có lỗi xảy ra khi chụp ảnh. Vui lòng thử lại.");
   }
-
-  const result = await ImagePicker.launchCameraAsync({
-    allowsMultipleSelection: false,
-    quality: 0.8,
-  });
-
-  if (result.canceled) {
-    return null;
-  }
-
-  return mapAssetToFile(result.assets?.[0]);
 };
 
 // Pick image from gallery (images only)
